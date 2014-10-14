@@ -1,0 +1,36 @@
+<project>
+
+	<property name="src" value="src/"/>
+	<property name="build" value="build/"/>
+
+	<path id="classpath">
+    <pathelement location="Docker.jar"/>
+	</path>
+
+	<target name="clean">
+		<delete dir="${build}/classes" includes="**/*.class"/>
+		<delete file="Docker.jar"/>
+	</target>
+	
+	<target name="build">
+		<mkdir dir="${build}"/>
+		<mkdir dir="${build}/classes"/>
+		<javac srcdir="${src}" destdir="${build}/classes" debug="true">
+		</javac>
+	</target>
+
+	<target name="jar" depends="build">
+		<jar destfile="Docker.jar" basedir="${build}/classes"/>
+	</target>
+
+	<target name="dock" depends="jar">
+    <javadoc sourcepath="${source}" packagenames="*">
+			<doclet name="edu.virginia.cs.Doc" path="Docker.jar" >
+				<param name="-mysqlhost" value="host" />
+				<param name="-mysqluser" value="user" />
+				<param name="-mysqlpass" value="pass" />
+				<param name="-mysqldb" value="db" />
+			</doclet>
+		</javadoc>
+	</target>
+</project>
