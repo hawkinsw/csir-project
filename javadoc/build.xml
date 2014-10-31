@@ -5,6 +5,7 @@
 
 	<path id="classpath">
     <pathelement location="Docker.jar"/>
+    <pathelement location="/usr/lib/jvm/java-7-openjdk-amd64/lib/tools.jar"/>
 	</path>
 
 	<target name="clean">
@@ -21,6 +22,30 @@
 
 	<target name="jar" depends="build">
 		<jar destfile="Docker.jar" basedir="${build}/classes"/>
+	</target>
+
+	<target name="source" depends="jar" >
+		<java fork="true" classname="edu.virginia.cs.Source">
+			<arg value="-file" />
+			<arg value="src/edu/virginia/cs/Source.java" />
+			<arg value="-mysqlhost" />
+			<arg value="localhost" />
+			<arg value="-mysqluser"/>
+			<arg value="ir" />
+			<arg value="-mysqlpass" />
+			<arg value="ir" />
+			<arg value="-mysqldb" />
+			<arg value="ir" />
+			<arg value="-sourcename" />
+			<arg value="Docker" />
+			<arg value="-sourceurl" />
+			<arg value="http://www.cs.virginia.edu/" />
+			<arg value="-sourcepackage" />
+			<arg value="docker.tar.gz" />
+			<classpath>
+				<path refid="classpath"/>
+			</classpath>
+		</java>
 	</target>
 
 	<target name="dock" depends="jar">
