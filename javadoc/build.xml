@@ -4,6 +4,7 @@
 	<property name="build" value="build/"/>
 
 	<path id="classpath">
+		<pathelement location="/usr/share/java/mysql.jar"/>
     <pathelement location="Docker.jar"/>
     <pathelement location="/usr/lib/jvm/java-7-openjdk-amd64/lib/tools.jar"/>
 	</path>
