@@ -50,12 +50,15 @@
 	</target>
 
 	<target name="dock" depends="jar">
-    <javadoc sourcepath="${source}" packagenames="*">
-			<doclet name="edu.virginia.cs.Doc" path="Docker.jar" >
-				<param name="-mysqlhost" value="host" />
-				<param name="-mysqluser" value="user" />
-				<param name="-mysqlpass" value="pass" />
-				<param name="-mysqldb" value="db" />
+    <javadoc access="private" sourcepath="${source}" packagenames="*">
+			<doclet name="edu.virginia.cs.Doc" pathref="classpath" >
+				<param name="-mysqlhost" value="localhost" />
+				<param name="-mysqluser" value="ir" />
+				<param name="-mysqlpass" value="ir" />
+				<param name="-mysqldb" value="ir" />
+				<param name="-sourcename" value="Docker" />
+				<param name="-sourceurl" value="http://www.cs.virginia.edu/" />
+				<param name="-sourcepackage" value="docker.tar.gz" />
 			</doclet>
 		</javadoc>
 	</target>
