@@ -39,7 +39,7 @@ docker: docker.cpp Makefile docdb.o
 docdb.o: docdb.cpp docdb.hpp Makefile
 	g++ -std=c++11 $(MYSQL_INCLUDES) -c docdb.cpp
 
-docdb_test: docdb.cpp docdb_test.cpp
+docdb_test: docdb.o docdb_test.cpp
 	g++ -std=c++11 $(MYSQL_INCLUDES) -o docdb_test docdb.cpp docdb_test.cpp $(MYSQL_LIBS)
 
 test:
