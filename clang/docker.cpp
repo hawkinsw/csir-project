@@ -61,6 +61,9 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 				int sourceId = -1;
 				FunctionDecl *fd = d->getAsFunction();
 				DeclarationNameInfo dni = fd->getNameInfo();
+				string functionType;
+
+				functionType = fd->getReturnType().getAsString();
 				cout << "Adding function " << dni.getAsString() << endl;
 				if (fd->hasBody()) {
 					string functionBodyString;
@@ -74,8 +77,22 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 					 * required to insert the source rather than update it.
 					 */
 
-					if ((sourceId = m_docDb->addSource(m_packageId, "method", dni.getAsString(), functionBodyStringStream.str())) == -1) {
-						cout << "Error occurred adding source for function " << dni.getAsString() << endl;
+					if ((sourceId = m_docDb->addSource(m_packageId,
+						"method",
+						functionType,
+						dni.getAsString(),
+						functionBodyStringStream.str())) == -1) {
+						cout << "Error occurred adding source for function " 
+						     << dni.getAsString() << endl;
+					}
+				}
+				if (sourceId != -1) {
+					/* insert parameters. */
+					for (FunctionDecl::param_iterator pi = fd->param_begin(); 
+					     pi != fd->param_end();
+						   pi++) {
+						ParmVarDecl *pvd = *pi;
+						m_docDb->addParameter(m_packageId, sourceId, pvd->getOriginalType().getAsString(), pvd->getNameAsString());
 					}
 				}
 			}
