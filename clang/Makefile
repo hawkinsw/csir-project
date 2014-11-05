@@ -1,4 +1,6 @@
 CLANG_HOME := /home/hawkinsw/code/csir/llvm/install
+MYSQL_INCLUDES=-I/usr/include/mysql/ -I/usr/include/mysql++/
+MYSQL_LIBS=-lmysqlpp -lmysqlclient
 LLVMCOMPONENTS=option
 LLVMCONFIG=$(CLANG_HOME)/bin/llvm-config
 LIBS=\
