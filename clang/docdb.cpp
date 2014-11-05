@@ -26,7 +26,8 @@ class DocDbMysqlWrapper {
 			*addDocumentationQuery,
 			*getPackageIdQuery,
 			*getSourceIdQuery,
-			*updateSourceQuery;
+			*updateSourceQuery,
+			*addParameterQuery;
 		std::string mysqlUser;
 		std::string mysqlPass;
 		std::string mysqlHost;
@@ -85,13 +86,13 @@ int DocDb::addPackage(string name, string filename, string url) {
 	}
 }
 
-int DocDb::addSource(int packageId, string type, string name, string code) {
+int DocDb::addSource(int packageId, string type, string return_type, string name, string code) {
 	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		int id = -1;
 		SimpleResult res;
 
-		res = m_wrapper->addSourceQuery->execute(packageId, type, name, code);
+		res = m_wrapper->addSourceQuery->execute(packageId, type, return_type, name, code);
 		id = res.insert_id();
 
 		return id;
@@ -108,6 +109,22 @@ int DocDb::addDocumentation(int packageId, int sourceId, string documentation) {
 		SimpleResult res;
 
 		res = m_wrapper->addDocumentationQuery->execute(packageId, sourceId, documentation);
+		id = res.insert_id();
+
+		return id;
+	} catch (const Exception &ex) {
+		printException(ex);
+		return -1;
+	}
+}
+
+int DocDb::addParameter(int packageId, int sourceId, string type, string name) {
+	CHECK_CONNECTED(m_wrapper->isConnected);
+	try {
+		int id = -1;
+		SimpleResult res;
+
+		res = m_wrapper->addParameterQuery->execute(packageId,sourceId,type,name);
 		id = res.insert_id();
 
 		return id;
@@ -180,9 +197,9 @@ bool DocDb::prepareQueries() {
 
 		m_wrapper->addSourceQuery = new Query(m_wrapper->con);
 		(*m_wrapper->addSourceQuery) << "INSERT INTO source "
-			"(package_id, type, name, source) "
+			"(package_id, type, return_type, name, source) "
 			"VALUES "
-			"(%0q,%1q,%2q, %3q)";
+			"(%0q,%1q,%2q,%3q,%4q)";
 		m_wrapper->addSourceQuery->parse();
 
 		m_wrapper->addDocumentationQuery = new Query(m_wrapper->con);
@@ -191,6 +208,13 @@ bool DocDb::prepareQueries() {
 			"VALUES "
 			"(%0q,%1q,%2q)";
 		m_wrapper->addDocumentationQuery->parse();
+
+		m_wrapper->addParameterQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addParameterQuery) << "INSERT INTO parameter "
+			"(package_id, source_id, type, name) "
+			"VALUES "
+			"(%0q,%1q,%2q,%3q)";
+		m_wrapper->addParameterQuery->parse();
 
 		m_wrapper->getPackageIdQuery = new Query(m_wrapper->con);
 		(*m_wrapper->getPackageIdQuery) << "SELECT id "
