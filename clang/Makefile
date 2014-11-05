@@ -35,6 +35,10 @@ docker: docker.cpp Makefile
 	$(shell $(LLVMCONFIG) --libs) \
 	$(shell $(LLVMCONFIG) --system-libs) \
 	$(shell $(LLVMCONFIG) --ldflags --libs $(LLVMCOMPONENTS))
+
+docdb_test: docdb.cpp docdb_test.cpp
+	g++ -std=c++11 $(MYSQL_INCLUDES) -o docdb_test docdb.cpp docdb_test.cpp $(MYSQL_LIBS)
+
 clean:
 	rm -f docker
 
