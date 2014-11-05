@@ -18,6 +18,10 @@ int main() {
 	cout << docDb.addDocumentation(packageId, sourceId, "Documentation1") << endl;
 	cout << packageId << " =? " << docDb.getPackageIdFromName("name") << endl;
 	cout << sourceId << " =? " << docDb.getSourceIdFromName(packageId, "test1") << endl;
+	if (docDb.updateSource(packageId, sourceId, "return 1;"))
+		cout << "Update succeeded!" << endl;
+	else
+		cout << "Update failed!\n" << endl;
 
 	docDb.disconnect();
 

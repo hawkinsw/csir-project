@@ -18,6 +18,7 @@ class DocDb {
 		int addDocumentation(int packageId, int sourceId, std::string documentation);
 		int getPackageIdFromName(std::string name);
 		int getSourceIdFromName(int packageId, std::string name);
+		bool updateSource(int packageId, int sourceId, std::string source);
 
 	private:
 		bool prepareQueries();
@@ -35,7 +36,8 @@ class DocDb {
 			*m_addSourceQuery,
 			*m_addDocumentationQuery,
 			*m_getPackageIdQuery,
-			*m_getSourceIdQuery;
+			*m_getSourceIdQuery,
+			*m_updateSourceQuery;
 };
 
 #endif

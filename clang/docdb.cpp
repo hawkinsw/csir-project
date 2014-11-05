@@ -126,6 +126,22 @@ int DocDb::getSourceIdFromName(int packageId, string name) {
 	}
 }
 
+bool DocDb::updateSource(int packageId, int sourceId, string source) {
+	CHECK_CONNECTED(m_isConnected);
+	try {
+		SimpleResult res;
+
+		res = m_updateSourceQuery->execute(packageId, sourceId, source);
+		if (!res)
+			return false;
+
+		return true;
+	} catch (const Exception &ex) {
+		printException(ex);
+		return false;
+	}
+}
+
 bool DocDb::prepareQueries() {
 	try {
 		m_addPackageQuery = new Query(m_con);
@@ -162,6 +178,13 @@ bool DocDb::prepareQueries() {
 			"WHERE "
 			"package_id=%0q and name=%1q";
 		m_getSourceIdQuery->parse();
+
+		m_updateSourceQuery = new Query(m_con);
+		(*m_updateSourceQuery) << "UPDATE source SET "
+			"source=%2q "
+			"WHERE "
+			"package_id=%0q and name=%1q";
+		m_updateSourceQuery->parse();
 
 	} catch (const Exception &ex) {
 		printException(ex);
