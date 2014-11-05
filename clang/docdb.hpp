@@ -2,7 +2,8 @@
 #define DOCKER_MYSQL_H
 
 #include <string>
-#include <mysql++/mysql++.h>
+
+class DocDbMysqlWrapper;
 
 class DocDb {
 	public:
@@ -23,21 +24,7 @@ class DocDb {
 	private:
 		bool prepareQueries();
 
-		std::string m_mysqlUser;
-		std::string m_mysqlPass;
-		std::string m_mysqlHost;
-		std::string m_mysqlDb;
-
-		bool m_isConnected;
-
-		mysqlpp::DBDriver *m_driver;
-		mysqlpp::Connection *m_con;
-		mysqlpp::Query *m_addPackageQuery,
-			*m_addSourceQuery,
-			*m_addDocumentationQuery,
-			*m_getPackageIdQuery,
-			*m_getSourceIdQuery,
-			*m_updateSourceQuery;
+		DocDbMysqlWrapper *m_wrapper;
 };
 
 #endif

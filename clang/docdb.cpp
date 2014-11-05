@@ -1,12 +1,37 @@
 #include "docdb.hpp"
 #include <iostream>
 #include <string>
+#include <mysql++/mysql++.h>
 
 using namespace std;
 using namespace mysqlpp;
 
 #define CHECK_CONNECTED(a) \
 if (!a) return -1;
+
+/*
+ * Required to keep mysql headers from
+ * polluting the docdb.hpp file. If those
+ * files are included, then clang cannot
+ * compile since they require RTTI and clang
+ * (at least in this configuration) refuses
+ * to compile with that option.
+ */
+class DocDbMysqlWrapper {
+	public:
+		bool isConnected;
+		mysqlpp::Connection *con;
+		mysqlpp::Query *addPackageQuery,
+			*addSourceQuery,
+			*addDocumentationQuery,
+			*getPackageIdQuery,
+			*getSourceIdQuery,
+			*updateSourceQuery;
+		std::string mysqlUser;
+		std::string mysqlPass;
+		std::string mysqlHost;
+		std::string mysqlDb;
+};
 
 void printException(const Exception &ex) {
 	cout << "Exception: " << ex.what() << endl;
@@ -17,38 +42,40 @@ DocDb::DocDb(string mysqlHost,
 	string mysqlPass,
 	string mysqlDa) {
 
-	m_mysqlUser = mysqlUser;
-	m_mysqlPass = mysqlPass;
-	m_mysqlHost = mysqlHost;
-	m_mysqlDb = mysqlDa;
+	m_wrapper = new DocDbMysqlWrapper();
 
-	m_isConnected = false;
+	m_wrapper->mysqlUser = mysqlUser;
+	m_wrapper->mysqlPass = mysqlPass;
+	m_wrapper->mysqlHost = mysqlHost;
+	m_wrapper->mysqlDb = mysqlDa;
+
+	m_wrapper->isConnected = false;
 }
 
 bool DocDb::connect() {
-	m_con = new Connection();
+	m_wrapper->con = new Connection();
 
-	if (!m_con->connect(m_mysqlDb.c_str(),
-	    m_mysqlHost.c_str(),
-			m_mysqlUser.c_str(),
-			m_mysqlPass.c_str())) {
+	if (!m_wrapper->con->connect(m_wrapper->mysqlDb.c_str(),
+	    m_wrapper->mysqlHost.c_str(),
+			m_wrapper->mysqlUser.c_str(),
+			m_wrapper->mysqlPass.c_str())) {
 		return false;
 	}
 
 	if (!prepareQueries()) {
 		return false;
 	}
-	m_isConnected = true;
+	m_wrapper->isConnected = true;
 	return true;
 }
 
 int DocDb::addPackage(string name, string filename, string url) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		int id = -1;
 		SimpleResult res;
 
-		res = m_addPackageQuery->execute(name, filename, url);
+		res = m_wrapper->addPackageQuery->execute(name, filename, url);
 		id = res.insert_id();
 
 		return id;
@@ -59,12 +86,12 @@ int DocDb::addPackage(string name, string filename, string url) {
 }
 
 int DocDb::addSource(int packageId, string type, string name, string code) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		int id = -1;
 		SimpleResult res;
 
-		res = m_addSourceQuery->execute(packageId, type, name, code);
+		res = m_wrapper->addSourceQuery->execute(packageId, type, name, code);
 		id = res.insert_id();
 
 		return id;
@@ -75,12 +102,12 @@ int DocDb::addSource(int packageId, string type, string name, string code) {
 }
 
 int DocDb::addDocumentation(int packageId, int sourceId, string documentation) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		int id = -1;
 		SimpleResult res;
 
-		res = m_addDocumentationQuery->execute(packageId, sourceId, documentation);
+		res = m_wrapper->addDocumentationQuery->execute(packageId, sourceId, documentation);
 		id = res.insert_id();
 
 		return id;
@@ -91,12 +118,12 @@ int DocDb::addDocumentation(int packageId, int sourceId, string documentation) {
 }
 
 int DocDb::getPackageIdFromName(string name) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		string idAsString;
 		StoreQueryResult res;
 
-		res = m_getPackageIdQuery->store(name);
+		res = m_wrapper->getPackageIdQuery->store(name);
 		if (res.empty())
 			return -1;
 		
@@ -109,12 +136,12 @@ int DocDb::getPackageIdFromName(string name) {
 }
 
 int DocDb::getSourceIdFromName(int packageId, string name) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		string idAsString;
 		StoreQueryResult res;
 
-		res = m_getSourceIdQuery->store(packageId, name);
+		res = m_wrapper->getSourceIdQuery->store(packageId, name);
 		if (res.empty())
 			return -1;
 		
@@ -127,11 +154,11 @@ int DocDb::getSourceIdFromName(int packageId, string name) {
 }
 
 bool DocDb::updateSource(int packageId, int sourceId, string source) {
-	CHECK_CONNECTED(m_isConnected);
+	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		SimpleResult res;
 
-		res = m_updateSourceQuery->execute(packageId, sourceId, source);
+		res = m_wrapper->updateSourceQuery->execute(packageId, sourceId, source);
 		if (!res)
 			return false;
 
@@ -144,47 +171,47 @@ bool DocDb::updateSource(int packageId, int sourceId, string source) {
 
 bool DocDb::prepareQueries() {
 	try {
-		m_addPackageQuery = new Query(m_con);
-		(*m_addPackageQuery) << "INSERT INTO package "
+		m_wrapper->addPackageQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addPackageQuery) << "INSERT INTO package "
 			"(name, package_file_name, package_url) "
 			"VALUES "
 			"(%0q,%1q,%2q)";
-		m_addPackageQuery->parse();
+		m_wrapper->addPackageQuery->parse();
 
-		m_addSourceQuery = new Query(m_con);
-		(*m_addSourceQuery) << "INSERT INTO source "
+		m_wrapper->addSourceQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addSourceQuery) << "INSERT INTO source "
 			"(package_id, type, name, source) "
 			"VALUES "
 			"(%0q,%1q,%2q, %3q)";
-		m_addSourceQuery->parse();
+		m_wrapper->addSourceQuery->parse();
 
-		m_addDocumentationQuery = new Query(m_con);
-		(*m_addDocumentationQuery) << "INSERT INTO documentation "
+		m_wrapper->addDocumentationQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addDocumentationQuery) << "INSERT INTO documentation "
 			"(package_id, source_id, documentation) "
 			"VALUES "
 			"(%0q,%1q,%2q)";
-		m_addDocumentationQuery->parse();
+		m_wrapper->addDocumentationQuery->parse();
 
-		m_getPackageIdQuery = new Query(m_con);
-		(*m_getPackageIdQuery) << "SELECT id "
+		m_wrapper->getPackageIdQuery = new Query(m_wrapper->con);
+		(*m_wrapper->getPackageIdQuery) << "SELECT id "
 			"FROM package "
 			"WHERE "
 			"name=%0q";
-		m_getPackageIdQuery->parse();
+		m_wrapper->getPackageIdQuery->parse();
 
-		m_getSourceIdQuery = new Query(m_con);
-		(*m_getSourceIdQuery) << "SELECT id "
+		m_wrapper->getSourceIdQuery = new Query(m_wrapper->con);
+		(*m_wrapper->getSourceIdQuery) << "SELECT id "
 			"FROM source "
 			"WHERE "
 			"package_id=%0q and name=%1q";
-		m_getSourceIdQuery->parse();
+		m_wrapper->getSourceIdQuery->parse();
 
-		m_updateSourceQuery = new Query(m_con);
-		(*m_updateSourceQuery) << "UPDATE source SET "
+		m_wrapper->updateSourceQuery = new Query(m_wrapper->con);
+		(*m_wrapper->updateSourceQuery) << "UPDATE source SET "
 			"source=%2q "
 			"WHERE "
 			"package_id=%0q and name=%1q";
-		m_updateSourceQuery->parse();
+		m_wrapper->updateSourceQuery->parse();
 
 	} catch (const Exception &ex) {
 		printException(ex);
@@ -194,9 +221,9 @@ bool DocDb::prepareQueries() {
 }
 
 bool DocDb::disconnect() {
-	if (m_isConnected)
-		m_con->disconnect();
+	if (m_wrapper->isConnected)
+		m_wrapper->con->disconnect();
 
-	m_isConnected = false;
+	m_wrapper->isConnected = false;
 	return true;
 }

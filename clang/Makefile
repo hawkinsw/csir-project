@@ -24,17 +24,20 @@ LIBS=\
 -lclangLex\
 -lclangBasic
 
-#	-I$(CLANG_HOME)/include
-#	-L$(CLANG_HOME)/lib $(LIBS)
-docker: docker.cpp Makefile
-	$(CLANG_HOME)/bin/clang++ -o docker docker.cpp \
+docker: docker.cpp Makefile docdb.o
+	$(CLANG_HOME)/bin/clang++ -o docker docker.cpp docdb.o \
 	-I$(shell $(LLVMCONFIG) --src-root)/tools/clang/include \
 	-I$(shell $(LLVMCONFIG) --obj-root)/tools/clang/include \
 	$(shell $(LLVMCONFIG) --cxxflags) \
+	-fexceptions \
 	$(LIBS) \
 	$(shell $(LLVMCONFIG) --libs) \
 	$(shell $(LLVMCONFIG) --system-libs) \
-	$(shell $(LLVMCONFIG) --ldflags --libs $(LLVMCOMPONENTS))
+	$(shell $(LLVMCONFIG) --ldflags --libs $(LLVMCOMPONENTS)) \
+	$(MYSQL_LIBS)
+
+docdb.o: docdb.cpp docdb.hpp Makefile
+	g++ -std=c++11 $(MYSQL_INCLUDES) -c docdb.cpp
 
 docdb_test: docdb.cpp docdb_test.cpp
 	g++ -std=c++11 $(MYSQL_INCLUDES) -o docdb_test docdb.cpp docdb_test.cpp $(MYSQL_LIBS)
