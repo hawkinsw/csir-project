@@ -21,13 +21,15 @@ public class DocDb {
 	private PreparedStatement mGetPackageIdStmt = null;
 	private PreparedStatement mGetSourceIdStmt = null;
 	private PreparedStatement mUpdateSourceStmt = null;
+	private PreparedStatement mInsertParameterStmt = null;
 
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url) VALUES (?,?,?)";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
-	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, name, source) VALUES (?,?,?,?)";
+	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, source) VALUES (?,?,?,?,?)";
 	private static final String SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
 	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=?";
 	private static final String UPDATE_SOURCE_SQL = "UPDATE source SET source=? WHERE package_id=? and id=?";
+	private static final String INSERT_PARAMETER_SQL = "INSERT INTO parameter (package_id, source_id, type, name) VALUES (?,?,?,?)";
 
 	public DocDb(String mysqlHost,
 		String mysqlUser,
@@ -75,6 +77,9 @@ public class DocDb {
 				SELECT_SOURCE_ID_SQL);
 			mUpdateSourceStmt = mSqlConnection.prepareStatement(
 				UPDATE_SOURCE_SQL);
+			mInsertParameterStmt = mSqlConnection.prepareStatement(
+				INSERT_PARAMETER_SQL,
+				Statement.RETURN_GENERATED_KEYS);
 		} catch (SQLException e) {
 			mIsConnected = false;
 		}
@@ -180,14 +185,15 @@ public class DocDb {
 		}
 	}
 
-	public int addSource(int packageId, String type, String name, String code) {
+	public int addSource(int packageId, String type, String returnType, String name, String code) {
 		if (!mIsConnected) return -1;
 		try {
 			mInsertSourceStmt.clearParameters();
 			mInsertSourceStmt.setInt(1, packageId);
 			mInsertSourceStmt.setString(2, type);
-			mInsertSourceStmt.setString(3, name);
-			mInsertSourceStmt.setString(4, code);
+			mInsertSourceStmt.setString(3, returnType);
+			mInsertSourceStmt.setString(4, name);
+			mInsertSourceStmt.setString(5, code);
 
 			/*
 			 * Yes, this returns a boolean, but it's meaning
@@ -237,6 +243,28 @@ public class DocDb {
 			mInsertDocumentationStmt.execute();
 
 			return getAutoId(mInsertDocumentationStmt);
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return -1;
+		}
+	}
+
+	public int addParameter(int packageId,
+		int sourceId,
+		String type,
+		String name) {
+		if (!mIsConnected) return -1;
+
+		try {
+			mInsertParameterStmt.clearParameters();
+			mInsertParameterStmt.setInt(1, packageId);
+			mInsertParameterStmt.setInt(2, sourceId);
+			mInsertParameterStmt.setString(3, type);
+			mInsertParameterStmt.setString(4, name);
+
+			mInsertParameterStmt.execute();
+
+			return getAutoId(mInsertParameterStmt);
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
 			return -1;

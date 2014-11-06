@@ -6,6 +6,7 @@ import com.sun.source.util.Trees;
 import com.sun.source.util.JavacTask;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.BlockTree;
+import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
@@ -219,6 +220,13 @@ public class Source extends AbstractProcessor {
 						body += statement.toString() + "\n";
 					}
 					mDb.updateSource(mPackageId, sourceId, body);
+
+					for (VariableTree v : methodNode.getParameters()) {
+						String parameterType = v.getType().toString();
+						String parameterName = v.getName().toString();
+
+						mDb.addParameter(mPackageId,sourceId,parameterType,parameterName);
+					}
 				} else {
 					System.err.println("Warning: Could not update source for method " + methodName + ".");
 				}

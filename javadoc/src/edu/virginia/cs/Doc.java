@@ -149,6 +149,7 @@ public class Doc extends Doclet {
 			System.out.println("method: " + methodDoc.qualifiedName());
 			int sourceId = mDb.addSource(mPackageId, 
 				"method",
+				methodDoc.returnType().toString(),
 				methodDoc.qualifiedName(),
 				"");
 
@@ -166,6 +167,7 @@ public class Doc extends Doclet {
 
 			int sourceId = mDb.addSource(mPackageId, 
 				"method",
+				"",
 				constructorDoc.qualifiedName(),
 				"");
 
