@@ -166,7 +166,7 @@ public class Doc extends Doclet {
 			System.out.println("constructor: " + constructorDoc.qualifiedName());
 
 			int sourceId = mDb.addSource(mPackageId, 
-				"method",
+				"class",
 				"",
 				constructorDoc.qualifiedName(),
 				"");
