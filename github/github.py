@@ -3,6 +3,18 @@
 from bs4 import BeautifulSoup
 from doxygen import Doxygen
 import urllib2
+from github3 import GitHub
+
+class GithubSearch:
+	def __init__(self, query, language, user, password):
+		self.query = query
+		self.language = language
+		self.user = user
+		self.password = password
+		self.g = GitHub(self.user, self.password)
+
+	def search(self):
+		return self.g.search_repositories(self.query + " language:" + self.language, number=2)
 
 class GithubTrending:
 	TrendingBaseUrl = "http://github.com/trending"
@@ -17,7 +29,7 @@ class GithubTrending:
 			projectUrl = project.find("a")['href']
 			(_, projectUser, projectRepo) = projectUrl.split("/", 2)
 			self.repositories.append(GithubRepository(projectUser, projectRepo))
-		
+
 		response.close
 
 class GithubRepository:
