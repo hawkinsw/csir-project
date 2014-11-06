@@ -217,12 +217,11 @@ public class Source extends AbstractProcessor {
 					body = new String();
 					for (StatementTree statement : b.getStatements()) {
 						body += statement.toString() + "\n";
-						mDb.updateSource(mPackageId, sourceId, body);
 					}
+					mDb.updateSource(mPackageId, sourceId, body);
 				} else {
 					System.err.println("Warning: Could not update source for method " + methodName + ".");
 				}
-
 
 				/*
 				System.out.println(body);
