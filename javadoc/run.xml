@@ -1,0 +1,49 @@
+<project>
+
+	<property name="src" value="src/"/>
+	<property name="build" value="build/"/>
+
+	<path id="classpath">
+		<pathelement location="/usr/share/java/mysql.jar"/>
+    <pathelement location="Docker.jar"/>
+    <pathelement location="/usr/lib/jvm/java-7-openjdk-amd64/lib/tools.jar"/>
+	</path>
+
+	<target name="source">
+		<java fork="true" classname="edu.virginia.cs.Source">
+			<arg value="-file" />
+			<arg value="${source}" />
+			<arg value="-mysqlhost" />
+			<arg value="${db_host}" />
+			<arg value="-mysqluser"/>
+			<arg value="${db_user}" />
+			<arg value="-mysqlpass" />
+			<arg value="${db_pass}" />
+			<arg value="-mysqldb" />
+			<arg value="${db_db}" />
+			<arg value="-sourcename" />
+			<arg value="${source_name}" />
+			<arg value="-sourceurl" />
+			<arg value="${source_url}/" />
+			<arg value="-sourcepackage" />
+			<arg value="${source_package}" />
+			<classpath>
+				<path refid="classpath"/>
+			</classpath>
+		</java>
+	</target>
+
+	<target name="dock">
+    <javadoc access="private" sourcepath="${source}" packagenames="*">
+			<doclet name="edu.virginia.cs.Doc" pathref="classpath" >
+				<param name="-mysqlhost" value="${db_host}" />
+				<param name="-mysqluser" value="${db_user}" />
+				<param name="-mysqlpass" value="${db_pass}" />
+				<param name="-mysqldb" value="${db_db}" />
+				<param name="-sourcename" value="${source_name}" />
+				<param name="-sourceurl" value="${source_url}" />
+				<param name="-sourcepackage" value="${source_package}" />
+			</doclet>
+		</javadoc>
+	</target>
+</project>
