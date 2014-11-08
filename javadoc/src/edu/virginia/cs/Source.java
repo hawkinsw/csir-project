@@ -23,8 +23,11 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.element.Name;
 import javax.lang.model.util.Elements;
+import javax.lang.model.util.ElementScanner6;
+import javax.lang.model.type.TypeKind;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
@@ -165,10 +168,14 @@ public class Source extends AbstractProcessor {
 
 		for (Element e : re.getRootElements()) {
 			TreePath treePath = m_trees.getPath(e);
+			DependencyVisitor dependencyVisitor = new DependencyVisitor();
+
+			dependencyVisitor.scan(e, null);
 
 			visitor.setDocDb(db);
 			visitor.setPackageId(packageId);
 			visitor.setQualification(mElementUtils.getPackageOf(e).toString());
+			visitor.setDependencies(dependencyVisitor.getDependencies());
 
 			visitor.scan(treePath, m_trees);
 		}
@@ -179,14 +186,37 @@ public class Source extends AbstractProcessor {
 
 	private Trees m_trees;
 
+	private class DependencyVisitor extends ElementScanner6<Void,Void> {
+		private List<String> mDependencies = null;
+		{
+			mDependencies = new LinkedList<String>();
+		}
+		public Void visitVariable(VariableElement variableElement, Void v) {
+			String variableTypeName = variableElement.asType().toString();
+			TypeKind variableTypeKind = variableElement.asType().getKind();
+			if (!variableTypeKind.isPrimitive() &&
+			    !variableTypeName.startsWith("java.") &&
+			    !variableTypeName.startsWith("com.sun.") &&
+					!variableTypeName.startsWith("javax.")) {
+				mDependencies.add(variableTypeName);
+			}
+			return super.visitVariable(variableElement, v);
+		}
+		public List<String> getDependencies() {
+			return mDependencies;
+		}
+	}
+
 	private class SourceVisitor extends TreePathScanner<Object,Trees> {
 		private String mQualification = null;
 		private DocDb mDb = null;
 		private int mPackageId = -1;
 		private String mClass = null;
+		private List<String> mDependencies = null;
 
 		public void setQualification(String qualifier) {
 			mQualification = qualifier;
+			mDependencies = new LinkedList<String>();
 		}
 
 		public void setDocDb(DocDb db) {
@@ -197,8 +227,30 @@ public class Source extends AbstractProcessor {
 			mPackageId = id;
 		}
 
+		public void setDependencies(List<String> dependencies) {
+			mDependencies = dependencies;
+		}
+
 		public Object visitClass(ClassTree classNode, Trees trees) {
 			mClass = classNode.getSimpleName().toString();
+
+			if (mQualification != null && mDb != null && mPackageId != -1) {
+				int sourceId = mDb.getSourceIdFromName(mPackageId, mQualification + "." + mClass);
+				if (sourceId != -1) {
+					/*
+					 * update any dependencies that might point here.
+					 */
+					mDb.updateDependencyId(mClass, sourceId);
+
+					/*
+					 * Create any dependencies that might point from here.
+					 */
+					for (String dependencyName : mDependencies) {
+						System.err.println("Adding dependency on " + dependencyName);
+						mDb.addDependencyName(mPackageId, sourceId, dependencyName);
+					}
+				}
+			}
 			return super.visitClass(classNode, trees);
 		}
 
