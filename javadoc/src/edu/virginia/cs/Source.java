@@ -12,6 +12,7 @@ import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
 
 import java.util.Set;
+import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedList;
 import java.io.IOException;
@@ -36,7 +37,6 @@ import javax.tools.ToolProvider;
 
 import edu.virginia.cs.DocDb;
 
-@SupportedAnnotationTypes("*")
 public class Source extends AbstractProcessor {
 	private static String oMysqlHost = null, 
 		oMysqlUser = null,
@@ -142,6 +142,12 @@ public class Source extends AbstractProcessor {
 		mMysqlUser = mysqlUser;
 		mMysqlPass = mysqlPass;
 		mMysqlDb = mysqlDb;
+	}
+
+	public Set<String> getSupportedAnnotationTypes() {
+		HashSet<String> annotationTypes = new HashSet<String>();
+		annotationTypes.add("*");
+		return annotationTypes;
 	}
 
 	public void init(ProcessingEnvironment pe) {
