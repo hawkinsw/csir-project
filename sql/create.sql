@@ -4,6 +4,7 @@ drop table if exists package;
 drop table if exists source;
 drop table if exists documentation;
 drop table if exists parameter;
+drop table if exists dependency;
 
 create table package (
 	id integer not null primary key auto_increment,
@@ -32,3 +33,9 @@ create table documentation (
 	source_id integer not null,
 	documentation text);
 
+create table dependency (
+	id integer not null primary key auto_increment,
+	package_id integer not null,
+	source_id integer not null,
+	depends_on_id integer,
+	depends_on_name varchar(255));
