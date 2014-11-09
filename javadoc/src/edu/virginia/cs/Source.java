@@ -247,6 +247,21 @@ public class Source extends AbstractProcessor {
 
 			if (mQualification != null && mDb != null && mPackageId != -1) {
 				int sourceId = mDb.getSourceIdFromName(mPackageId, mQualification + "." + mClass);
+				if (sourceId == -1) {
+					/*
+					 * Put in this source if we need to.
+					 */
+					sourceId = mDb.addSource(mPackageId,
+						"class",
+						"",
+						mQualification + "." + mClass,
+						"");
+				}
+
+				/*
+				 * Even though we just added it, there could have
+				 * been a database error.
+				 */
 				if (sourceId != -1) {
 					/*
 					 * update any dependencies that might point here.
@@ -276,6 +291,13 @@ public class Source extends AbstractProcessor {
 				System.err.println("Method: " + methodName);
 
 				sourceId = mDb.getSourceIdFromName(mPackageId, methodName);
+
+				if (sourceId == -1) {
+					/*
+					 * Put in this source if we need to.
+					 */
+					sourceId = mDb.addSource(mPackageId, "method", "", methodName, "");
+				}
 
 				if (sourceId != -1) {
 					body = new String();
