@@ -176,7 +176,7 @@ public class Source extends AbstractProcessor {
 			TreePath treePath = m_trees.getPath(e);
 			DependencyVisitor dependencyVisitor = new DependencyVisitor();
 
-			dependencyVisitor.scan(e, null);
+			dependencyVisitor.scan(e, mElementUtils);
 
 			visitor.setDocDb(db);
 			visitor.setPackageId(packageId);
@@ -192,21 +192,26 @@ public class Source extends AbstractProcessor {
 
 	private Trees m_trees;
 
-	private class DependencyVisitor extends ElementScanner6<Void,Void> {
+	private class DependencyVisitor extends ElementScanner6<Void,Elements> {
 		private List<String> mDependencies = null;
 		{
 			mDependencies = new LinkedList<String>();
 		}
-		public Void visitVariable(VariableElement variableElement, Void v) {
+		public Void visitVariable(VariableElement variableElement, Elements utils) {
 			String variableTypeName = variableElement.asType().toString();
 			TypeKind variableTypeKind = variableElement.asType().getKind();
+
+			if (!variableTypeName.contains(".")) {
+				variableTypeName = utils.getPackageOf(variableElement) + "." + variableTypeName;
+			}
+
 			if (!variableTypeKind.isPrimitive() &&
 			    !variableTypeName.startsWith("java.") &&
 			    !variableTypeName.startsWith("com.sun.") &&
 					!variableTypeName.startsWith("javax.")) {
 				mDependencies.add(variableTypeName);
 			}
-			return super.visitVariable(variableElement, v);
+			return super.visitVariable(variableElement, utils);
 		}
 		public List<String> getDependencies() {
 			return mDependencies;
