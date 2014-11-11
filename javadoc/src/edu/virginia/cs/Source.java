@@ -6,10 +6,12 @@ import com.sun.source.util.Trees;
 import com.sun.source.util.JavacTask;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.BlockTree;
+import com.sun.source.tree.ImportTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.CompilationUnitTree;
 
 import java.util.Set;
 import java.util.HashSet;
@@ -25,8 +27,10 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Name;
 import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.lang.model.util.ElementScanner6;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaCompiler;
@@ -153,12 +157,12 @@ public class Source extends AbstractProcessor {
 	public void init(ProcessingEnvironment pe) {
 		super.init(pe);
 		mElementUtils = pe.getElementUtils();
+		m_typeUtils = pe.getTypeUtils();
 		m_trees = Trees.instance(pe);	
 	}
 
 	public boolean process(Set<? extends TypeElement> annotations, 
 		RoundEnvironment re) {
-		SourceVisitor visitor = new SourceVisitor();
 		int packageId = -1;
 		DocDb db = new DocDb(mMysqlHost, mMysqlUser, mMysqlPass, mMysqlDb);
 
@@ -173,17 +177,22 @@ public class Source extends AbstractProcessor {
 		}
 
 		for (Element e : re.getRootElements()) {
+			ExecutableVisitor visitor = new ExecutableVisitor();
+			ClassVisitor classVisitor = new ClassVisitor();
 			TreePath treePath = m_trees.getPath(e);
-			DependencyVisitor dependencyVisitor = new DependencyVisitor();
+			List<String> dependencies = null;
 
-			dependencyVisitor.scan(e, mElementUtils);
+			dependencies = calculateDependenciesFromPath(treePath);
+
+			classVisitor.setDocDb(db);
+			classVisitor.setPackageId(packageId);
+			classVisitor.setDependencies(dependencies);
+			classVisitor.scan(treePath, mElementUtils.getPackageOf(e).toString());
 
 			visitor.setDocDb(db);
 			visitor.setPackageId(packageId);
-			visitor.setQualification(mElementUtils.getPackageOf(e).toString());
-			visitor.setDependencies(dependencyVisitor.getDependencies());
-
-			visitor.scan(treePath, m_trees);
+			visitor.setUtils(mElementUtils);
+			visitor.scan(e, m_trees);
 		}
 
 		db.disconnect();
@@ -191,73 +200,61 @@ public class Source extends AbstractProcessor {
 	}
 
 	private Trees m_trees;
+	private Types m_typeUtils;
 
-	private class DependencyVisitor extends ElementScanner6<Void,Elements> {
-		private List<String> mDependencies = null;
-		{
-			mDependencies = new LinkedList<String>();
+	private List<String> calculateDependenciesFromPath(TreePath tp) {
+		CompilationUnitTree cpuTree = tp.getCompilationUnit();
+		LinkedList<String> dependencies = new LinkedList<String>();
+		for (ImportTree importTree : cpuTree.getImports()) {
+			String importName = importTree.getQualifiedIdentifier().toString();
+			if (!importName.startsWith("java.") &&
+			    !importName.startsWith("com.sun.") &&
+			    !importName.startsWith("javax."))
+				dependencies.add(importName);
 		}
-		public Void visitVariable(VariableElement variableElement, Elements utils) {
-			String variableTypeName = variableElement.asType().toString();
-			TypeKind variableTypeKind = variableElement.asType().getKind();
-
-			if (!variableTypeName.contains(".")) {
-				variableTypeName = utils.getPackageOf(variableElement) + "." + variableTypeName;
-			}
-
-			if (!variableTypeKind.isPrimitive() &&
-			    !variableTypeName.startsWith("java.") &&
-			    !variableTypeName.startsWith("com.sun.") &&
-					!variableTypeName.startsWith("javax.")) {
-				mDependencies.add(variableTypeName);
-			}
-			return super.visitVariable(variableElement, utils);
-		}
-		public List<String> getDependencies() {
-			return mDependencies;
-		}
+		return dependencies;
 	}
 
-	private class SourceVisitor extends TreePathScanner<Object,Trees> {
-		private String mQualification = null;
-		private DocDb mDb = null;
-		private int mPackageId = -1;
-		private String mClass = null;
+	private class ClassVisitor extends TreePathScanner<Object,String> {
 		private List<String> mDependencies = null;
+		private int mPackageId = -1;
+		private DocDb mDb = null;
 
-		public void setQualification(String qualifier) {
-			mQualification = qualifier;
-			mDependencies = new LinkedList<String>();
+		public void setDependencies(List<String> dependencies) {
+			mDependencies = dependencies;
+		}
+
+		public void setPackageId(int packageId) {
+			mPackageId = packageId;
 		}
 
 		public void setDocDb(DocDb db) {
 			mDb = db;
 		}
 
-		public void setPackageId(int id) {
-			mPackageId = id;
-		}
+		public Object visitClass(ClassTree classNode, String nameQualification) {
+			String clazz = classNode.getSimpleName().toString();
 
-		public void setDependencies(List<String> dependencies) {
-			mDependencies = dependencies;
-		}
+			/*
+			 * Skip anonymous inner classes.
+			 */
+			if (clazz.equals(""))
+			{
+				System.err.println("Skipping inner class.");
+				return super.visitClass(classNode, nameQualification);
+			}
 
-		public Object visitClass(ClassTree classNode, Trees trees) {
-			mClass = classNode.getSimpleName().toString();
+			clazz = nameQualification + "." + clazz;
+			System.err.println("Visiting class: " + clazz);
 
-			if (mQualification != null && mDb != null && mPackageId != -1) {
-				int sourceId = mDb.getSourceIdFromName(mPackageId, mQualification + "." + mClass);
+			if (mDb != null && mPackageId != -1) {
+				int sourceId = mDb.getSourceIdFromName(mPackageId, clazz);
 				if (sourceId == -1) {
 					/*
 					 * Put in this source if we need to.
 					 */
-					sourceId = mDb.addSource(mPackageId,
-						"class",
-						"",
-						mQualification + "." + mClass,
-						"");
+					sourceId = mDb.addSource(mPackageId, "class", "", clazz, "");
 				}
-
 				/*
 				 * Even though we just added it, there could have
 				 * been a database error.
@@ -266,8 +263,7 @@ public class Source extends AbstractProcessor {
 					/*
 					 * update any dependencies that might point here.
 					 */
-					mDb.updateDependencyId(mClass, sourceId);
-
+					mDb.updateDependencyId(clazz, sourceId);
 					/*
 					 * Create any dependencies that might point from here.
 					 */
@@ -277,17 +273,54 @@ public class Source extends AbstractProcessor {
 					}
 				}
 			}
-			return super.visitClass(classNode, trees);
+			return super.visitClass(classNode, nameQualification);
+		}
+	}
+
+	private class ExecutableVisitor extends ElementScanner6<Object,Trees> {
+		private String mQualification = null;
+		private DocDb mDb = null;
+		private int mPackageId = -1;
+		private Elements mUtils = null;
+
+		public void setDocDb(DocDb db) {
+			mDb = db;
 		}
 
-		public Object visitMethod(MethodTree methodNode, Trees trees) {
-			if (mQualification != null && mDb != null && mPackageId != -1) {
+		public void setPackageId(int id) {
+			mPackageId = id;
+		}
+
+		public void setUtils(Elements utils) {
+			mUtils = utils;
+		}
+
+		private String fullExecutableName(ExecutableElement e) {
+			String name = e.getSimpleName().toString();
+
+			if (!name.contains(".")) {
+				name = mUtils.getPackageOf(e) + "." + e.getEnclosingElement().getSimpleName() + "." + name;
+			}
+			return name;
+		}
+
+		public Object visitExecutable(ExecutableElement execElement, Trees trees) {
+			if (mDb != null && mPackageId != -1) {
 				int sourceId = -1;
-				BlockTree b = methodNode.getBody();
+				MethodTree execTree = null;
+				BlockTree b = null;
 				String body = null;
 				String methodName = null;
 
-				methodName = mQualification + "." + mClass + "." + methodNode.getName();
+				execTree = trees.getTree(execElement);
+				b = execTree.getBody();
+
+				if (b == null) {
+					System.err.println("Skipping empty method.");
+					return super.visitExecutable(execElement, trees);
+				}
+
+				methodName = fullExecutableName(execElement);
 				System.err.println("Method: " + methodName);
 
 				sourceId = mDb.getSourceIdFromName(mPackageId, methodName);
@@ -306,21 +339,20 @@ public class Source extends AbstractProcessor {
 					}
 					mDb.updateSource(mPackageId, sourceId, body);
 
-					for (VariableTree v : methodNode.getParameters()) {
-						String parameterType = v.getType().toString();
-						String parameterName = v.getName().toString();
+					for (VariableElement v : execElement.getParameters()) {
+						String parameterType = v.asType().toString();
+						String parameterName = v.getSimpleName().toString();
 
 						mDb.addParameter(mPackageId,sourceId,parameterType,parameterName);
 					}
 				} else {
 					System.err.println("Warning: Could not update source for method " + methodName + ".");
 				}
-
 				/*
 				System.out.println(body);
-				 */
+				*/
 			}
-			return super.visitMethod(methodNode, trees);
+			return super.visitExecutable(execElement, trees);
 		}
 	}
 }
