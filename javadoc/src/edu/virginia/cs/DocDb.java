@@ -20,9 +20,11 @@ public class DocDb {
 	private PreparedStatement mInsertSourceStmt = null;
 	private PreparedStatement mGetPackageIdStmt = null;
 	private PreparedStatement mGetSourceIdStmt = null;
+	private PreparedStatement mGetGlobalSourceIdStmt = null;
 	private PreparedStatement mUpdateSourceStmt = null;
 	private PreparedStatement mInsertParameterStmt = null;
 	private PreparedStatement mInsertDependencyNameStmt = null;
+	private PreparedStatement mInsertDependencyIdStmt = null;
 	private PreparedStatement mUpdateDependencyIdStmt = null;
 
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url) VALUES (?,?,?)";
@@ -30,9 +32,11 @@ public class DocDb {
 	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, source) VALUES (?,?,?,?,?)";
 	private static final String SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
 	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=?";
+	private static final String SELECT_GLOBAL_SOURCE_ID_SQL = "SELECT id FROM source WHERE name=?";
 	private static final String UPDATE_SOURCE_SQL = "UPDATE source SET source=? WHERE package_id=? and id=?";
 	private static final String INSERT_PARAMETER_SQL = "INSERT INTO parameter (package_id, source_id, type, name) VALUES (?,?,?,?)";
 	private static final String INSERT_DEPENDENCY_NAME_SQL = "INSERT INTO dependency (package_id, source_id, depends_on_name) VALUES (?,?,?)";
+	private static final String INSERT_DEPENDENCY_ID_SQL = "INSERT INTO dependency (package_id, source_id, depends_on_id) VALUES (?,?,?)";
 	private static final String UPDATE_DEPENDENCY_ID_SQL = "UPDATE dependency SET depends_on_id=?, depends_on_name=\"\" WHERE depends_on_name=?";
 
 	public DocDb(String mysqlHost,
@@ -79,6 +83,8 @@ public class DocDb {
 				SELECT_PACKAGE_ID_SQL);
 			mGetSourceIdStmt = mSqlConnection.prepareStatement(
 				SELECT_SOURCE_ID_SQL);
+			mGetGlobalSourceIdStmt = mSqlConnection.prepareStatement(
+				SELECT_GLOBAL_SOURCE_ID_SQL);
 			mUpdateSourceStmt = mSqlConnection.prepareStatement(
 				UPDATE_SOURCE_SQL);
 			mInsertParameterStmt = mSqlConnection.prepareStatement(
@@ -86,6 +92,9 @@ public class DocDb {
 				Statement.RETURN_GENERATED_KEYS);
 			mInsertDependencyNameStmt = mSqlConnection.prepareStatement(
 				INSERT_DEPENDENCY_NAME_SQL,
+				Statement.RETURN_GENERATED_KEYS);
+			mInsertDependencyIdStmt = mSqlConnection.prepareStatement(
+				INSERT_DEPENDENCY_ID_SQL,
 				Statement.RETURN_GENERATED_KEYS);
 			mUpdateDependencyIdStmt = mSqlConnection.prepareStatement(
 				UPDATE_DEPENDENCY_ID_SQL);
@@ -126,6 +135,37 @@ public class DocDb {
 			mGetPackageIdStmt.execute();
 
 			idRs = mGetPackageIdStmt.getResultSet();
+			if (idRs.next()) {
+				id = idRs.getInt(1);
+			}
+
+			if (idRs != null) {
+				idRs.close();
+			}
+
+			return id;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return -1;
+		}
+	}
+
+	private int getGlobalSourceIdFromName(String name) {
+		if (!mIsConnected) return -1;
+		try {
+			ResultSet idRs = null;
+			int id = -1;
+
+			mGetGlobalSourceIdStmt.clearParameters();
+			mGetGlobalSourceIdStmt.setString(1, name);
+
+			mGetGlobalSourceIdStmt.execute();
+
+			/*
+			 * There may be multiple. However, in the world of java,
+			 * package . class name should be unique.
+			 */
+			idRs = mGetGlobalSourceIdStmt.getResultSet();
 			if (idRs.next()) {
 				id = idRs.getInt(1);
 			}
@@ -196,6 +236,14 @@ public class DocDb {
 
 	public int addDependencyName(int packageId, int sourceId, String dependsOn) {
 		if (!mIsConnected) return -1;
+		int existingDependencyId = -1;
+
+		existingDependencyId = getGlobalSourceIdFromName(dependsOn);
+
+		if (existingDependencyId != -1) {
+			return addDependencyId(packageId, sourceId, existingDependencyId);
+		}
+
 		try {
 			ResultSet aiRs = null;
 			int key = -1;
@@ -213,6 +261,31 @@ public class DocDb {
 			mInsertDependencyNameStmt.execute();
 
 			return getAutoId(mInsertDependencyNameStmt);
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return -1;
+		}
+	}
+
+	public int addDependencyId(int packageId, int sourceId, int dependsOn) {
+		if (!mIsConnected) return -1;
+		try {
+			ResultSet aiRs = null;
+			int key = -1;
+
+			mInsertDependencyIdStmt.clearParameters();
+			mInsertDependencyIdStmt.setInt(1, packageId);
+			mInsertDependencyIdStmt.setInt(2, sourceId);
+			mInsertDependencyIdStmt.setInt(3, dependsOn);
+
+			/*
+			 * Yes, this returns a boolean, but it's meaning
+			 * is useless in determining if this statement
+			 * was successful. Disregard.
+			 */
+			mInsertDependencyIdStmt.execute();
+
+			return getAutoId(mInsertDependencyIdStmt);
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
 			return -1;
@@ -246,6 +319,8 @@ public class DocDb {
 	public boolean updateDependencyId(String dependsOnName, int dependsOnId) {
 		if (!mIsConnected) return false;
 		try {
+			System.err.println("Attempting to update dependency: " + dependsOnName + " -> " + dependsOnId);
+
 			mUpdateDependencyIdStmt.clearParameters();
 			mUpdateDependencyIdStmt.setInt(1, dependsOnId);
 			mUpdateDependencyIdStmt.setString(2, dependsOnName);
