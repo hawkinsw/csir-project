@@ -1,9 +1,10 @@
 #!/usr/bin/perl
 
-my $name, $package, $directory, $db_host, $db_user, $db_pass, $db_db;
+my $name, $package, $directory, $url, $db_host, $db_user, $db_pass, $db_db;
 BEGIN {
 $name = shift;
 $package = shift;
+$url = shift;
 $directory = shift;
 $db_host = shift;
 $db_user = shift;
@@ -11,14 +12,11 @@ $db_pass = shift;
 $db_db = shift;
 }
 
+#use strict;
 use lib "$directory/perlmod";
 use DoxyDocs;
-use lib "./";
+use lib "./doxygen/";
 use docdb;
-
-print $name . "-\n";
-print $package . "-\n";
-print $directory . "-\n";
 
 $db = new docdb("localhost", "ir", "ir", "ir");
 $db = new docdb($db_host, $db_user, $db_pass, $db_db);
