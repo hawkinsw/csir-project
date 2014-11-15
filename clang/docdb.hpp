@@ -15,6 +15,8 @@ class DocDb {
 		bool connect();
 		bool disconnect();
 
+		int addDependencyId(int packageId, int sourceId, int dependsOn);
+		int addDependencyName(int packageId, int sourceId, std::string dependsOn);
 		int addPackage(std::string name, std::string filename, std::string url);
 		int addSource(int packageId, std::string type, std::string returnType, std::string name, std::string code);
 		int addDocumentation(int packageId, int sourceId, std::string documentation);
@@ -23,9 +25,11 @@ class DocDb {
 		int getPackageIdFromName(std::string name);
 		int getSourceIdFromName(int packageId, std::string name);
 
+		bool updateDependency(std::string name, int dependsOnId);
 		bool updateSource(int packageId, int sourceId, std::string source);
 
 	private:
+		int getGlobalSourceIdFromName(std::string name);
 		bool prepareQueries();
 
 		DocDbMysqlWrapper *m_wrapper;

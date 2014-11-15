@@ -27,7 +27,11 @@ class DocDbMysqlWrapper {
 			*getPackageIdQuery,
 			*getSourceIdQuery,
 			*updateSourceQuery,
-			*addParameterQuery;
+			*addParameterQuery,
+			*addDependsNameQuery,
+			*addDependsIdQuery,
+			*getGlobalSourceIdQuery,
+			*updateDependencyQuery;
 		std::string mysqlUser;
 		std::string mysqlPass;
 		std::string mysqlHost;
@@ -134,6 +138,44 @@ int DocDb::addParameter(int packageId, int sourceId, string type, string name) {
 	}
 }
 
+int DocDb::addDependencyId(int packageId, int sourceId, int dependsOn) {
+	CHECK_CONNECTED(m_wrapper->isConnected);
+	try {
+		int id = -1;
+		SimpleResult res;
+
+		res = m_wrapper->addDependsIdQuery->execute(packageId,sourceId,dependsOn);
+		id = res.insert_id();
+
+		return id;
+	} catch (const Exception &ex) {
+		printException(ex);
+		return -1;
+	}
+}
+
+int DocDb::addDependencyName(int packageId, int sourceId, string dependsOn) {
+	CHECK_CONNECTED(m_wrapper->isConnected);
+	try {
+		int id = -1;
+		int existingId = -1;
+		SimpleResult res;
+
+		existingId = getGlobalSourceIdFromName(dependsOn);
+		if (existingId != -1) {
+			return addDependencyId(packageId, sourceId, existingId);
+		}
+
+		res = m_wrapper->addDependsNameQuery->execute(packageId,sourceId,dependsOn);
+		id = res.insert_id();
+
+		return id;
+	} catch (const Exception &ex) {
+		printException(ex);
+		return -1;
+	}
+}
+
 int DocDb::getPackageIdFromName(string name) {
 	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
@@ -170,12 +212,46 @@ int DocDb::getSourceIdFromName(int packageId, string name) {
 	}
 }
 
+int DocDb::getGlobalSourceIdFromName(string name) {
+	CHECK_CONNECTED(m_wrapper->isConnected);
+	try {
+		string idAsString;
+		StoreQueryResult res;
+
+		res = m_wrapper->getGlobalSourceIdQuery->store(name);
+		if (res.empty())
+			return -1;
+
+		idAsString = string(res[0][0]);
+		return std::stoi(idAsString);
+	} catch (const Exception &ex) {
+		printException(ex);
+		return -1;
+	}
+}
+
 bool DocDb::updateSource(int packageId, int sourceId, string source) {
 	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		SimpleResult res;
 
 		res = m_wrapper->updateSourceQuery->execute(packageId, sourceId, source);
+		if (!res)
+			return false;
+
+		return true;
+	} catch (const Exception &ex) {
+		printException(ex);
+		return false;
+	}
+}
+
+bool DocDb::updateDependency(string name, int dependsOnId) {
+	CHECK_CONNECTED(m_wrapper->isConnected);
+	try {
+		SimpleResult res;
+
+		res = m_wrapper->updateDependencyQuery->execute(name, dependsOnId);
 		if (!res)
 			return false;
 
@@ -216,6 +292,20 @@ bool DocDb::prepareQueries() {
 			"(%0q,%1q,%2q,%3q)";
 		m_wrapper->addParameterQuery->parse();
 
+		m_wrapper->addDependsIdQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addDependsIdQuery) << "INSERT INTO dependency "
+			"(package_id, source_id, depends_on_id) "
+			"VALUES "
+			"(%0q,%1q,%2q)";
+		m_wrapper->addDependsIdQuery->parse();
+
+		m_wrapper->addDependsNameQuery = new Query(m_wrapper->con);
+		(*m_wrapper->addDependsNameQuery) << "INSERT INTO dependency "
+			"(package_id, source_id, depends_on_name) "
+			"VALUES "
+			"(%0q,%1q,%2q)";
+		m_wrapper->addDependsNameQuery->parse();
+
 		m_wrapper->getPackageIdQuery = new Query(m_wrapper->con);
 		(*m_wrapper->getPackageIdQuery) << "SELECT id "
 			"FROM package "
@@ -230,12 +320,27 @@ bool DocDb::prepareQueries() {
 			"package_id=%0q and name=%1q";
 		m_wrapper->getSourceIdQuery->parse();
 
+		m_wrapper->getGlobalSourceIdQuery = new Query(m_wrapper->con);
+		(*m_wrapper->getGlobalSourceIdQuery) << "SELECT id "
+			"FROM source "
+			"WHERE "
+			"name=%0q";
+		m_wrapper->getGlobalSourceIdQuery->parse();
+
 		m_wrapper->updateSourceQuery = new Query(m_wrapper->con);
 		(*m_wrapper->updateSourceQuery) << "UPDATE source SET "
 			"source=%2q "
 			"WHERE "
 			"package_id=%0q and name=%1q";
 		m_wrapper->updateSourceQuery->parse();
+
+		m_wrapper->updateDependencyQuery = new Query(m_wrapper->con);
+		(*m_wrapper->updateDependencyQuery) << "UPDATE dependency SET "
+			"depends_on_id=%1q, "
+			"depends_on_name=NULL "
+			"WHERE "
+			"depends_on_name=%0q";
+		m_wrapper->updateDependencyQuery->parse();
 
 	} catch (const Exception &ex) {
 		printException(ex);
