@@ -15,7 +15,7 @@ create table package (
 create table source (
 	id integer not null primary key auto_increment,
 	package_id integer not null,
-	type enum('class', 'method') not null default 'method',
+	type enum('class', 'method', 'namespace') not null default 'method',
 	name text not null,
 	return_type varchar(255),
 	source text);
