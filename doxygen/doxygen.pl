@@ -43,6 +43,7 @@ foreach $class (@{$doxydocs->{classes}}) {
 	# Insert a class -- high level marker for 
 	# dependency tracking.
 	#
+	#print "Class name: $class->{name}\n";
 	$class_source_id = $db->add_source($package_id,
 		"class",
 		"",
@@ -61,12 +62,21 @@ foreach $class (@{$doxydocs->{classes}}) {
 		#
 		# Collect the documentation for a method.
 		#
+		#print "Method name: $method->{name}\n";
+		foreach (@{$method->{brief}->{doc}}) {
+			if (ref($_) eq "HASH") {
+				if ($_->{type} eq 'text') {
+						$documentation .= $_->{content};
+				}
+			}
+		}
 		foreach (@{$method->{detailed}->{doc}}) {
 			if (ref($_) eq "HASH") {
 				$documentation .= $_->{content};
 			}
 		}
 		if ($documentation) {
+			#print $documentation . "\n";
 			$method_name = $class->{name} . "::" . $method->{name};
 			print $method_name . "\n";
 			$source_id = $db->add_source($package_id,
