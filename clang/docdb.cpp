@@ -331,7 +331,7 @@ bool DocDb::prepareQueries() {
 		(*m_wrapper->updateSourceQuery) << "UPDATE source SET "
 			"source=%2q "
 			"WHERE "
-			"package_id=%0q and name=%1q";
+			"package_id=%0q and id=%1q";
 		m_wrapper->updateSourceQuery->parse();
 
 		m_wrapper->updateDependencyQuery = new Query(m_wrapper->con);
