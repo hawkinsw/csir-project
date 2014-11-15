@@ -1,6 +1,11 @@
 #include "clang/Tooling/Tooling.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Tooling/CommonOptionsParser.h"
+#include "clang/Parse/ParseAST.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Host.h"
+#include "clang/Sema/Sema.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTConsumer.h"
@@ -45,6 +50,10 @@ static cl::opt<string> SourcePackage("sourcepackage",
 	cl::desc("Source package filename"),
 	cl::cat(DockerCategory),
 	cl::Required);
+static cl::opt<string> SourceFile("file",
+	cl::desc("Source filename"),
+	cl::cat(DockerCategory),
+	cl::Required);
 
 class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 	public:
@@ -56,15 +65,22 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 		bool VisitDecl(Decl *d) {
 			LangOptions langOptions;
 			PrintingPolicy pp(langOptions);
+			Decl::Kind k = d->getKind();
 
 			if (d->isFunctionOrFunctionTemplate()) {
 				int sourceId = -1;
 				FunctionDecl *fd = d->getAsFunction();
-				DeclarationNameInfo dni = fd->getNameInfo();
-				string functionType;
+				string functionName, functionType;
 
 				functionType = fd->getReturnType().getAsString();
-				cout << "Adding function " << dni.getAsString() << endl;
+				functionName = fd->getQualifiedNameAsString();
+
+				if (functionName.find(string("std::")) != std::string::npos) {
+					cout << "Skipping function " << functionName << endl;
+					return true;
+				}
+
+				cout << "Adding function " << functionName << endl;
 				if (fd->hasBody()) {
 					string functionBodyString;
 					raw_string_ostream functionBodyStringStream(functionBodyString);
@@ -80,10 +96,10 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 					if ((sourceId = m_docDb->addSource(m_packageId,
 						"method",
 						functionType,
-						dni.getAsString(),
+						functionName,
 						functionBodyStringStream.str())) == -1) {
 						cout << "Error occurred adding source for function " 
-						     << dni.getAsString() << endl;
+						     << functionName << endl;
 					}
 				}
 				if (sourceId != -1) {
@@ -95,6 +111,16 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 						m_docDb->addParameter(m_packageId, sourceId, pvd->getOriginalType().getAsString(), pvd->getNameAsString());
 					}
 				}
+			} else if (k == clang::Decl::Namespace) {
+				NamespaceDecl *nsd = cast<NamespaceDecl>(d);
+				cout << "Namespace decl: " << nsd->getQualifiedNameAsString() << endl;
+			} else if (k == clang::Decl::UsingDirective) {
+				string namespaceName;
+				raw_string_ostream namespaceNameStream(namespaceName);
+				UsingDirectiveDecl *usd = cast<UsingDirectiveDecl>(d);
+				const NamespaceDecl *nsd = usd->getNominatedNamespace()->getOriginalNamespace();
+				nsd->getNameForDiagnostic(namespaceNameStream, pp, true);
+				cout << "Using : " << namespaceNameStream.str() << endl;
 			}
 			return true;
 		}
@@ -104,14 +130,67 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 		int m_packageId;
 };
 
+class NamespaceTypoProvider : public clang::ExternalSemaSource {
+	Sema *CurrentSema;
+
+public:
+	NamespaceTypoProvider()
+			: CurrentSema(nullptr) {}
+
+	virtual void InitializeSema(Sema &S) { CurrentSema = &S; }
+
+	virtual void ForgetSema() { CurrentSema = nullptr; }
+
+	virtual TypoCorrection CorrectTypo(const DeclarationNameInfo &Typo,
+																		 int LookupKind, Scope *S, CXXScopeSpec *SS,
+																		 CorrectionCandidateCallback &CCC,
+																		 DeclContext *MemberContext,
+																		 bool EnteringContext,
+																		 const ObjCObjectPointerType *OPT) {
+		if (CurrentSema && LookupKind == Sema::LookupNamespaceName) {
+			DeclContext *DestContext = nullptr;
+			ASTContext &Context = CurrentSema->getASTContext();
+			if (SS)
+				DestContext = CurrentSema->computeDeclContext(*SS, EnteringContext);
+			if (!DestContext)
+				DestContext = Context.getTranslationUnitDecl();
+			IdentifierInfo *ToIdent =
+					CurrentSema->getPreprocessor().getIdentifierInfo(
+					Typo.getName().getAsString());
+			NamespaceDecl *NewNamespace =
+					NamespaceDecl::Create(Context, DestContext, false, Typo.getBeginLoc(),
+																Typo.getLoc(), ToIdent, nullptr);
+			DestContext->addDecl(NewNamespace);
+			TypoCorrection Correction(ToIdent);
+			Correction.addCorrectionDecl(NewNamespace);
+			return Correction;
+		}
+		return TypoCorrection();
+	}
+};
+
 class DockerASTConsumer : public ASTConsumer {
 	private:
 		DockerVisitor *visitor;
 	public:
+		DockerASTConsumer() {
+			visitor = NULL;
+		}
+
 		DockerASTConsumer(CompilerInstance *CI, int packageId, DocDb *db) {
 			visitor = new DockerVisitor(packageId, db);
 		}
-
+		/*
+		void HandleTranslationUnit(ASTContext &c) {
+			DeclContext *dc = c.getTranslationUnitDecl();
+			for (DeclContext::decl_iterator it = dc->decls_begin();
+			     it != dc->decls_end();
+					 it++) {
+				Decl *d = *it;
+				visitor->TraverseDecl(d);
+			}
+		}
+		*/
 		virtual bool HandleTopLevelDecl(DeclGroupRef DG) {
 			for (DeclGroupRef::iterator it = DG.begin(); it!=DG.end(); it++) {
 				Decl *d = *it;
@@ -121,42 +200,20 @@ class DockerASTConsumer : public ASTConsumer {
 		}
 };
 
-class DockerFrontendAction : public ASTFrontendAction {
-	public:
-		DockerFrontendAction(int packageId, DocDb *db) {
-			m_packageId = packageId;
-			m_docDb = db;
-		}
-
-		virtual std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef file) {
-			return std::unique_ptr<ASTConsumer>(new DockerASTConsumer(&CI, m_packageId, m_docDb));
-		}
-	private:
-		int m_packageId;
-		DocDb *m_docDb;
-};
-
-class DockerFrontendActionFactory : public FrontendActionFactory {
-	public:
-		DockerFrontendActionFactory(int packageId, DocDb *db) {
-			m_packageId = packageId;
-			m_docDb = db;
-		}
-		FrontendAction *create() override {
-			return new DockerFrontendAction(m_packageId, m_docDb);
-		}
-
-	private:
-		int m_packageId;
-		DocDb *m_docDb;
-};
-
 int main(int argc, const char *argv[]) {
 	int toolResult = 1;
 	int packageId = -1;
 	CommonOptionsParser op(argc, argv, DockerCategory);
-	ClangTool Tool(op.getCompilations(), op.getSourcePathList());
+	CompilerInstance ci;
+	SourceLocation sl = SourceLocation();
+	std::shared_ptr<TargetOptions> to_shared = std::shared_ptr<TargetOptions>(new TargetOptions());
+	TargetOptions *to = to_shared.get();
+	TargetInfo *ti;
+	LangOptions los;
+	FileID fileID;
+	NamespaceTypoProvider *nss = new NamespaceTypoProvider();
 	DocDb *db = new DocDb(MysqlHost, MysqlUser, MysqlPass, MysqlDb);
+	const FileEntry *file;
 
 	if (!db->connect()) {
 		return 1;
@@ -167,8 +224,44 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
-	toolResult = Tool.run(new DockerFrontendActionFactory(packageId, db));
+	to->Triple = llvm::sys::getDefaultTargetTriple();
+
+	ci.createDiagnostics();
+	ti = TargetInfo::CreateTargetInfo(ci.getDiagnostics(),to_shared);
+
+	ci.setTarget(ti);
+
+	/*
+	 * Turn on C++ support in the parser.
+	 */
+	los = ci.getLangOpts();
+	los.CPlusPlus = 1;
+	ci.getLangOpts() = los;
+
+	ci.createFileManager();
+	ci.createSourceManager(ci.getFileManager());
+	ci.createPreprocessor(clang::TU_Complete);
+	ci.createASTContext();
+
+	ci.setASTConsumer(std::unique_ptr<ASTConsumer>(
+		new DockerASTConsumer(&ci, packageId, db)));
+
+	ci.createSema(clang::TU_Complete, nullptr);
+	ci.getSema().addExternalSource(nss);
+
+	file = ci.getFileManager().getFile(SourceFile.c_str());
+	fileID = ci.getSourceManager().createFileID(file, sl, clang::SrcMgr::C_User);
+	ci.getSourceManager().setMainFileID(fileID);
+
+	ci.getDiagnosticClient().BeginSourceFile(
+		ci.getLangOpts(), &ci.getPreprocessor());
+
+	nss->InitializeSema(ci.getSema());
+	clang::ParseAST(ci.getSema(), false, false);
+
+	ci.getDiagnosticClient().EndSourceFile();
 
 	db->disconnect();
-	return toolResult;
+
+	return 1;
 }

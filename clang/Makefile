@@ -43,7 +43,7 @@ docdb_test: docdb.o docdb_test.cpp
 	g++ -std=c++11 $(MYSQL_INCLUDES) -o docdb_test docdb.cpp docdb_test.cpp $(MYSQL_LIBS)
 
 test:
-	./docker -mysqluser ir -mysqlpass ir -mysqldb ir -mysqlhost localhost -sourcename testing -sourcepackage package.tar.gz -sourceurl http://www.github.com/ docker.cpp --
+	./docker -mysqluser ir -mysqlpass ir -mysqldb ir -mysqlhost localhost -sourcename testing -sourcepackage package.tar.gz -sourceurl http://www.github.com/ -file docker.cpp docker.cpp --
 
 clean:
 	rm -f docker
