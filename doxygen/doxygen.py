@@ -39,9 +39,9 @@ class DoxygenRunner:
 		# Now, call source for each source file.
 		def dir_visitor(arg, directory, files):
 			for f in files:
-				if f.endswith("h") or f.endswith("hpp") or \
-				   f.endswith("cpp") or f.endswith("cc") or \
-				   f.endswith("cxx"):
+				if f.endswith(".h") or f.endswith(".hpp") or \
+				   f.endswith(".cpp") or f.endswith(".cc") or \
+				   f.endswith(".cxx"):
 					source_command = __docker_command__ + ["-mysqluser",db_user,
 						"-mysqlpass",db_pass,
 						"-mysqldb",db_db,
