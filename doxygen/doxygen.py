@@ -4,6 +4,7 @@ from subprocess import call
 from os.path import walk
 __doxygen_command__=["/home/hawkinsw/code/csir/project/doxygen/doxygen.pl"]
 __doxygen_prepare_command__=["/home/hawkinsw/code/csir/project/doxygen/prepare_doxygen.pl"]
+__docker_command__=["/home/hawkinsw/code/csir/project/clang/docker"]
 
 class DoxygenRunner:
 	def __init__(self, source_name, source_package, source_url, source_path):
@@ -41,16 +42,19 @@ class DoxygenRunner:
 				if f.endswith("h") or f.endswith("hpp") or \
 				   f.endswith("cpp") or f.endswith("cc") or \
 				   f.endswith("cxx"):
-					source_command = __doxygen_command__ + [self.source_name,
-						self.source_package,
-						self.source_url,
-						self.source_path,
-						db_host,
-						db_user,
-						db_pass,
-						db_db]
-#					print(" ".join(source_command))
-#					call(source_command)
+					source_command = __docker_command__ + ["-mysqluser",db_user,
+						"-mysqlpass",db_pass,
+						"-mysqldb",db_db,
+						"-mysqlhost",db_host,
+						"-sourcename",self.source_name,
+						"-sourcepackage",self.source_package,
+						"-sourceurl",self.source_url,
+						"-file",
+						directory + "/" + f,
+						directory + "/" + f,
+						"--"]
+					print(" ".join(source_command))
+					call(source_command)
 
 		walk(self.source_path, dir_visitor, None)
 
