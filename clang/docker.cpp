@@ -57,76 +57,120 @@ static cl::opt<string> SourceFile("file",
 
 class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 	public:
-		DockerVisitor(int packageId, DocDb *db) {
+		DockerVisitor(int packageId, DocDb *db, SourceManager *sm, LangOptions *lo) {
 			m_packageId = packageId;
 			m_docDb = db;
+			m_sourceManager = sm;
+			m_langOpts = lo;
+			m_dependencies = new vector<string>();
 		}
 
 		bool VisitDecl(Decl *d) {
-			LangOptions langOptions;
-			PrintingPolicy pp(langOptions);
+			PrintingPolicy pp(*m_langOpts);
 			Decl::Kind k = d->getKind();
 
 			if (d->isFunctionOrFunctionTemplate()) {
 				int sourceId = -1;
-				FunctionDecl *fd = d->getAsFunction();
+				FunctionDecl *fd = NULL;
 				string functionName, functionType;
+				Stmt *functionBody = NULL;
+				CharSourceRange functionRange;
+				StringRef source;
 
+				fd = d->getAsFunction();
 				functionType = fd->getReturnType().getAsString();
 				functionName = fd->getQualifiedNameAsString();
 
-				if (functionName.find(string("std::")) != std::string::npos) {
+				/*
+				 * Skip either std:: functions or those without
+				 * implementations.
+				 */
+				if (functionName.find(string("std::")) != std::string::npos ||
+				    !fd->hasBody()) {
 					cout << "Skipping function " << functionName << endl;
 					return true;
 				}
 
-				cout << "Adding function " << functionName << endl;
-				if (fd->hasBody()) {
-					string functionBodyString;
-					raw_string_ostream functionBodyStringStream(functionBodyString);
-					Stmt *functionBody = fd->getBody();
 
-					functionBody->printPretty(functionBodyStringStream, NULL, pp);
+				functionBody = fd->getBody();
+				functionRange = CharSourceRange::getCharRange(
+					functionBody->getSourceRange());
+				source = clang::Lexer::getSourceText(
+					functionRange,
+					*m_sourceManager,
+					*m_langOpts);
 
-					/*
-					 * Assume that we are running this first. That means we are
-					 * required to insert the source rather than update it.
-					 */
-
+				/*
+				 * Add or update source.
+				 */
+				sourceId = m_docDb->getSourceIdFromName(m_packageId, functionName);
+				if (sourceId == -1) {
+					cout << "Adding function " << functionName << endl;
 					if ((sourceId = m_docDb->addSource(m_packageId,
 						"method",
 						functionType,
 						functionName,
-						functionBodyStringStream.str())) == -1) {
+						source.str())) == -1) {
 						cout << "Error occurred adding source for function " 
 						     << functionName << endl;
 					}
+				} else {
+					cout << "Updating function " << functionName << endl;
+					m_docDb->updateSource(m_packageId, sourceId, source.str());
 				}
+
 				if (sourceId != -1) {
 					/* insert parameters. */
 					for (FunctionDecl::param_iterator pi = fd->param_begin(); 
 					     pi != fd->param_end();
 						   pi++) {
 						ParmVarDecl *pvd = *pi;
-						m_docDb->addParameter(m_packageId, sourceId, pvd->getOriginalType().getAsString(), pvd->getNameAsString());
+						m_docDb->addParameter(m_packageId,
+							sourceId,
+							pvd->getOriginalType().getAsString(),
+							pvd->getNameAsString());
+					}
+					for (vector<string>::iterator it = m_dependencies->begin();
+					     it != m_dependencies->end();
+							 it++) {
+						string dependencyName = *it;
+						cout << "Adding dependency on " << dependencyName << endl;
+						m_docDb->addDependencyName(m_packageId, sourceId, dependencyName);
 					}
 				}
 			} else if (k == clang::Decl::Namespace) {
-				NamespaceDecl *nsd = cast<NamespaceDecl>(d);
-				cout << "Namespace decl: " << nsd->getQualifiedNameAsString() << endl;
-			} else if (k == clang::Decl::UsingDirective) {
+				NamespaceDecl *nsd = NULL;
 				string namespaceName;
-				raw_string_ostream namespaceNameStream(namespaceName);
-				UsingDirectiveDecl *usd = cast<UsingDirectiveDecl>(d);
-				const NamespaceDecl *nsd = usd->getNominatedNamespace()->getOriginalNamespace();
-				nsd->getNameForDiagnostic(namespaceNameStream, pp, true);
-				cout << "Using : " << namespaceNameStream.str() << endl;
+
+				nsd = cast<NamespaceDecl>(d);
+				namespaceName = nsd->getQualifiedNameAsString();
+				cout << "Namespace decl: " << namespaceName << endl;
+				if (m_docDb->addSource(m_packageId,
+					"namespace",
+					"",
+					namespaceName,
+					"") == -1) {
+						cout << "Error occurred adding namespace " << namespaceName << endl;
+					}
+			} else if (k == clang::Decl::UsingDirective) {
+				UsingDirectiveDecl *usd = NULL;
+				NamespaceDecl *nsd = NULL;
+				string usingWhat;
+
+				usd = cast<UsingDirectiveDecl>(d);
+				nsd = usd->getNominatedNamespace()->getOriginalNamespace();
+				usingWhat = nsd->getQualifiedNameAsString();
+
+				m_dependencies->push_back(usingWhat);
 			}
 			return true;
 		}
 
 	private:
 		DocDb *m_docDb;
+		SourceManager *m_sourceManager;
+		LangOptions *m_langOpts;
+		vector<string> *m_dependencies;
 		int m_packageId;
 };
 
@@ -142,11 +186,11 @@ public:
 	virtual void ForgetSema() { CurrentSema = nullptr; }
 
 	virtual TypoCorrection CorrectTypo(const DeclarationNameInfo &Typo,
-																		 int LookupKind, Scope *S, CXXScopeSpec *SS,
-																		 CorrectionCandidateCallback &CCC,
-																		 DeclContext *MemberContext,
-																		 bool EnteringContext,
-																		 const ObjCObjectPointerType *OPT) {
+		int LookupKind, Scope *S, CXXScopeSpec *SS,
+		CorrectionCandidateCallback &CCC,
+		DeclContext *MemberContext,
+		bool EnteringContext,
+		const ObjCObjectPointerType *OPT) {
 		if (CurrentSema && LookupKind == Sema::LookupNamespaceName) {
 			DeclContext *DestContext = nullptr;
 			ASTContext &Context = CurrentSema->getASTContext();
@@ -159,7 +203,7 @@ public:
 					Typo.getName().getAsString());
 			NamespaceDecl *NewNamespace =
 					NamespaceDecl::Create(Context, DestContext, false, Typo.getBeginLoc(),
-																Typo.getLoc(), ToIdent, nullptr);
+			Typo.getLoc(), ToIdent, nullptr);
 			DestContext->addDecl(NewNamespace);
 			TypoCorrection Correction(ToIdent);
 			Correction.addCorrectionDecl(NewNamespace);
@@ -178,7 +222,7 @@ class DockerASTConsumer : public ASTConsumer {
 		}
 
 		DockerASTConsumer(CompilerInstance *CI, int packageId, DocDb *db) {
-			visitor = new DockerVisitor(packageId, db);
+			visitor = new DockerVisitor(packageId, db, &CI->getSourceManager(), &CI->getLangOpts());
 		}
 		/*
 		void HandleTranslationUnit(ASTContext &c) {
@@ -219,7 +263,8 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
-	if ((packageId = db->addPackage(SourceName, SourcePackage, SourceUrl))==-1) {
+	packageId = db->getPackageIdFromName(SourceName);
+	if (packageId == -1 && (packageId = db->addPackage(SourceName, SourcePackage, SourceUrl))==-1) {
 		db->disconnect();
 		return 1;
 	}
