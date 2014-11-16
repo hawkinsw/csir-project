@@ -75,6 +75,8 @@ foreach $class (@{$doxydocs->{classes}}) {
 				$documentation .= $_->{content};
 			}
 		}
+		$return_type = "";
+		$return_type = $method->{type} if defined $method->{type};
 		$parameter_count = scalar @{$method->{parameters}};
 		if ($documentation) {
 			#print $documentation . "\n";
@@ -82,7 +84,7 @@ foreach $class (@{$doxydocs->{classes}}) {
 			print $method_name . "\n";
 			$source_id = $db->add_source($package_id,
 				"method",
-				"",
+				$return_type,
 				$class->{name} . "::" . $method->{name},
 				$parameter_count,
 				"");
