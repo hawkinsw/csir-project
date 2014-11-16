@@ -10,6 +10,7 @@ from javadoc import javadoc
 from git import Repo
 import tempfile
 import shutil
+import docdb
 #import logging
 
 def get_runner(language,
@@ -24,7 +25,7 @@ def get_runner(language,
 	else:
 		return None
 
-def analyze(repo, repo_language):
+def analyze(repo, repo_language, db):
 	repo_dir = tempfile.mkdtemp()
 	repo_source_name = str(repo)
 	repo_source_package = repo.name
@@ -34,11 +35,15 @@ def analyze(repo, repo_language):
 	print("repo package: " + repo_source_package)
 	print("repo url: " + repo_source_url)
 
+	if db.packageExists(repo_source_name):
+		print("Skipping " + repo_source_name + " because we've already seen it.")
+		return
+
 	remote = Repo.clone_from(repo_source_url, repo_dir)
 	runner = get_runner(repo_language, repo_source_name, repo_source_package, repo_source_url, repo_dir)
 	if runner == None:
 		return
-	runner.run("localhost", "ir", "ir", "ir")
+	runner.run(db.host, db.user, db.password, db.db)
 	print(repo_dir)
 	shutil.rmtree(repo_dir)
 
@@ -59,12 +64,17 @@ def test_search():
 	#logger.addHandler(file_handler)
 	#logger.setLevel(logging.DEBUG)
 
-	search = github.GithubSearch("test", "js", "", "")
-	try:
-		for r in search.search():
-			print(r.repository)
-	except models.GitHubError as ghe:
-		print(ghe)
+	db = docdb.DocDb("localhost", "ir", "ir", "ir")
+
+	trending = github.GithubTrending("cpp")
+	for trender in trending.repositories:
+		print(trender)
+		search = github.GithubSearch(str(trender), "C++", "", "")
+		try:
+			for r in search.search(2):
+				analyze(r.repository, "C++", db)
+		except models.GitHubError as ghe:
+			print(ghe)
 
 if __name__ == "__main__":
 	test_search()
