@@ -19,9 +19,12 @@ class GithubSearch:
 class GithubTrending:
 	TrendingBaseUrl = "http://github.com/trending"
 
-	def __init__(self):
+	def __init__(self, language=None):
 		self.repositories = []
-		response = urllib2.urlopen(GithubTrending.TrendingBaseUrl)
+		trending_url = GithubTrending.TrendingBaseUrl
+		if not language == None:
+			trending_url += "?l=" + language
+		response = urllib2.urlopen(trending_url)
 		soup = BeautifulSoup(response.read())
 
 		projects = soup.find_all("h3", class_="repo-list-name")
