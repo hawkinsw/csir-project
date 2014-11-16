@@ -76,10 +76,12 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 				Stmt *functionBody = NULL;
 				CharSourceRange functionRange;
 				StringRef source;
+				unsigned functionParamCount;
 
 				fd = d->getAsFunction();
 				functionType = fd->getReturnType().getAsString();
 				functionName = fd->getQualifiedNameAsString();
+				functionParamCount = fd->getNumParams();
 
 				/*
 				 * Skip either std:: functions or those without
@@ -90,7 +92,6 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 					cout << "Skipping function " << functionName << endl;
 					return true;
 				}
-
 
 				functionBody = fd->getBody();
 				functionRange = CharSourceRange::getCharRange(
@@ -103,13 +104,16 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 				/*
 				 * Add or update source.
 				 */
-				sourceId = m_docDb->getSourceIdFromName(m_packageId, functionName);
+				sourceId = m_docDb->getSourceIdFromName(m_packageId,
+					functionName,
+					functionParamCount);
 				if (sourceId == -1) {
 					cout << "Adding function " << functionName << endl;
 					if ((sourceId = m_docDb->addSource(m_packageId,
 						"method",
 						functionType,
 						functionName,
+						functionParamCount,
 						source.str())) == -1) {
 						cout << "Error occurred adding source for function " 
 						     << functionName << endl;
@@ -149,6 +153,7 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 					"namespace",
 					"",
 					namespaceName,
+					0,
 					"") == -1) {
 						cout << "Error occurred adding namespace " << namespaceName << endl;
 					}

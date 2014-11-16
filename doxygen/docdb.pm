@@ -6,9 +6,9 @@ use DBI;
 package docdb;
 $docdb::INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url) VALUES (?,?,?)";
 $docdb::INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
-$docdb::INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, source) VALUES (?,?,?,?,?)";
+$docdb::INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?)";
 $docdb::SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
-$docdb::SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=?";
+$docdb::SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=? and parameter_count=?";
 $docdb::SELECT_GLOBAL_SOURCE_ID_SQL = "SELECT id FROM source WHERE name=?";
 $docdb::UPDATE_SOURCE_SQL = "UPDATE source SET source=? WHERE package_id=? and id=?";
 $docdb::INSERT_PARAMETER_SQL = "INSERT INTO parameter (package_id, source_id, type, name) VALUES (?,?,?,?)";
@@ -155,6 +155,7 @@ sub add_source {
 	my $type = shift;
 	my $return_type = shift;
 	my $name = shift;
+	my $parameter_count = shift;
 	my $code = shift;
 
 	return -1 unless ($self->{is_connected});
@@ -163,7 +164,8 @@ sub add_source {
 		$self->{insert_source}->bind_param(2, $type);
 		$self->{insert_source}->bind_param(3, $return_type);
 		$self->{insert_source}->bind_param(4, $name);
-		$self->{insert_source}->bind_param(5, $code);
+		$self->{insert_source}->bind_param(5, $parameter_count);
+		$self->{insert_source}->bind_param(6, $code);
 
 		$self->{insert_source}->execute();
 

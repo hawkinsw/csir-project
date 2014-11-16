@@ -90,13 +90,13 @@ int DocDb::addPackage(string name, string filename, string url) {
 	}
 }
 
-int DocDb::addSource(int packageId, string type, string return_type, string name, string code) {
+int DocDb::addSource(int packageId, string type, string return_type, string name, int parameter_count, string code) {
 	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		int id = -1;
 		SimpleResult res;
 
-		res = m_wrapper->addSourceQuery->execute(packageId, type, return_type, name, code);
+		res = m_wrapper->addSourceQuery->execute(packageId, type, return_type, name, parameter_count, code);
 		id = res.insert_id();
 
 		return id;
@@ -194,13 +194,13 @@ int DocDb::getPackageIdFromName(string name) {
 	}
 }
 
-int DocDb::getSourceIdFromName(int packageId, string name) {
+int DocDb::getSourceIdFromName(int packageId,string name,int parameter_count) {
 	CHECK_CONNECTED(m_wrapper->isConnected);
 	try {
 		string idAsString;
 		StoreQueryResult res;
 
-		res = m_wrapper->getSourceIdQuery->store(packageId, name);
+		res = m_wrapper->getSourceIdQuery->store(packageId, name, parameter_count);
 		if (res.empty())
 			return -1;
 		
@@ -273,9 +273,9 @@ bool DocDb::prepareQueries() {
 
 		m_wrapper->addSourceQuery = new Query(m_wrapper->con);
 		(*m_wrapper->addSourceQuery) << "INSERT INTO source "
-			"(package_id, type, return_type, name, source) "
+			"(package_id, type, return_type, name, parameter_count, source) "
 			"VALUES "
-			"(%0q,%1q,%2q,%3q,%4q)";
+			"(%0q,%1q,%2q,%3q,%4q,%5q)";
 		m_wrapper->addSourceQuery->parse();
 
 		m_wrapper->addDocumentationQuery = new Query(m_wrapper->con);
@@ -317,7 +317,7 @@ bool DocDb::prepareQueries() {
 		(*m_wrapper->getSourceIdQuery) << "SELECT id "
 			"FROM source "
 			"WHERE "
-			"package_id=%0q and name=%1q";
+			"package_id=%0q and name=%1q and parameter_count=%2q";
 		m_wrapper->getSourceIdQuery->parse();
 
 		m_wrapper->getGlobalSourceIdQuery = new Query(m_wrapper->con);

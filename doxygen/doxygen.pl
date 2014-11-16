@@ -75,14 +75,16 @@ foreach $class (@{$doxydocs->{classes}}) {
 				$documentation .= $_->{content};
 			}
 		}
+		$parameter_count = scalar @{$method->{parameters}};
 		if ($documentation) {
 			#print $documentation . "\n";
 			$method_name = $class->{name} . "::" . $method->{name};
 			print $method_name . "\n";
 			$source_id = $db->add_source($package_id,
 				"method",
-				"return",
+				"",
 				$class->{name} . "::" . $method->{name},
+				$parameter_count,
 				"");
 			if ($source_id != -1) {
 				if (!$db->add_documentation($package_id, $source_id, $documentation)) {

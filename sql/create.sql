@@ -18,6 +18,7 @@ create table source (
 	type enum('class', 'method', 'namespace') not null default 'method',
 	name text not null,
 	return_type varchar(255),
+	parameter_count integer not null default 1,
 	source text);
 
 create table parameter (

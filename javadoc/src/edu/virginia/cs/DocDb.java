@@ -29,9 +29,9 @@ public class DocDb {
 
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url) VALUES (?,?,?)";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
-	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, source) VALUES (?,?,?,?,?)";
+	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?)";
 	private static final String SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
-	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=?";
+	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=? and parameter_count=?";
 	private static final String SELECT_GLOBAL_SOURCE_ID_SQL = "SELECT id FROM source WHERE name=?";
 	private static final String UPDATE_SOURCE_SQL = "UPDATE source SET source=? WHERE package_id=? and id=?";
 	private static final String INSERT_PARAMETER_SQL = "INSERT INTO parameter (package_id, source_id, type, name) VALUES (?,?,?,?)";
@@ -181,7 +181,7 @@ public class DocDb {
 		}
 	}
 
-	public int getSourceIdFromName(int packageId, String name) {
+	public int getSourceIdFromName(int packageId,String name,int parameterCount) {
 		if (!mIsConnected) return -1;
 		try {
 			ResultSet idRs = null;
@@ -190,6 +190,7 @@ public class DocDb {
 			mGetSourceIdStmt.clearParameters();
 			mGetSourceIdStmt.setInt(1, packageId);
 			mGetSourceIdStmt.setString(2, name);
+			mGetSourceIdStmt.setInt(3, parameterCount);
 
 			mGetSourceIdStmt.execute();
 
@@ -292,7 +293,7 @@ public class DocDb {
 		}
 	}
 
-	public int addSource(int packageId, String type, String returnType, String name, String code) {
+	public int addSource(int packageId, String type, String returnType, String name, int parameterCount, String code) {
 		if (!mIsConnected) return -1;
 		try {
 			mInsertSourceStmt.clearParameters();
@@ -300,7 +301,8 @@ public class DocDb {
 			mInsertSourceStmt.setString(2, type);
 			mInsertSourceStmt.setString(3, returnType);
 			mInsertSourceStmt.setString(4, name);
-			mInsertSourceStmt.setString(5, code);
+			mInsertSourceStmt.setInt(5, parameterCount);
+			mInsertSourceStmt.setString(6, code);
 
 			/*
 			 * Yes, this returns a boolean, but it's meaning

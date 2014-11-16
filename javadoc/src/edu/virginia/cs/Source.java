@@ -248,12 +248,12 @@ public class Source extends AbstractProcessor {
 			System.err.println("Visiting class: " + clazz);
 
 			if (mDb != null && mPackageId != -1) {
-				int sourceId = mDb.getSourceIdFromName(mPackageId, clazz);
+				int sourceId = mDb.getSourceIdFromName(mPackageId, clazz, 0);
 				if (sourceId == -1) {
 					/*
 					 * Put in this source if we need to.
 					 */
-					sourceId = mDb.addSource(mPackageId, "class", "", clazz, "");
+					sourceId = mDb.addSource(mPackageId, "class", "", clazz, 0, "");
 				}
 				/*
 				 * Even though we just added it, there could have
@@ -311,9 +311,11 @@ public class Source extends AbstractProcessor {
 				BlockTree b = null;
 				String body = null;
 				String methodName = null;
+				int parameterCount = 0;
 
 				execTree = trees.getTree(execElement);
 				b = execTree.getBody();
+				parameterCount = execElement.getParameters().size();
 
 				if (b == null) {
 					System.err.println("Skipping empty method.");
@@ -323,13 +325,13 @@ public class Source extends AbstractProcessor {
 				methodName = fullExecutableName(execElement);
 				System.err.println("Method: " + methodName);
 
-				sourceId = mDb.getSourceIdFromName(mPackageId, methodName);
+				sourceId = mDb.getSourceIdFromName(mPackageId, methodName, parameterCount);
 
 				if (sourceId == -1) {
 					/*
 					 * Put in this source if we need to.
 					 */
-					sourceId = mDb.addSource(mPackageId, "method", "", methodName, "");
+					sourceId = mDb.addSource(mPackageId, "method", "", methodName, parameterCount, "");
 				}
 
 				if (sourceId != -1) {

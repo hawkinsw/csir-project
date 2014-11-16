@@ -151,6 +151,7 @@ public class Doc extends Doclet {
 				"method",
 				methodDoc.returnType().toString(),
 				methodDoc.qualifiedName(),
+				methodDoc.parameters().length,
 				"");
 
 			if (sourceId != -1)
@@ -169,6 +170,7 @@ public class Doc extends Doclet {
 				"class",
 				"",
 				constructorDoc.qualifiedName(),
+				0,
 				"");
 
 			if (sourceId != -1)
