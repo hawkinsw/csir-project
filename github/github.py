@@ -13,8 +13,8 @@ class GithubSearch:
 		self.password = password
 		self.g = GitHub(self.user, self.password)
 
-	def search(self):
-		return self.g.search_repositories(self.query + " language:" + self.language, number=2)
+	def search(self, num_results = 2):
+		return self.g.search_repositories(self.query + " language:" + self.language, number=num_results)
 
 class GithubTrending:
 	TrendingBaseUrl = "http://github.com/trending"
