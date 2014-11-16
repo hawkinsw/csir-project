@@ -166,7 +166,11 @@ class DockerVisitor : public RecursiveASTVisitor<DockerVisitor> {
 				nsd = usd->getNominatedNamespace()->getOriginalNamespace();
 				usingWhat = nsd->getQualifiedNameAsString();
 
-				m_dependencies->push_back(usingWhat);
+				if (usingWhat == string("std")) {
+					cout << "Skipping std dependency." << endl;
+				} else {
+					m_dependencies->push_back(usingWhat);
+				}
 			}
 			return true;
 		}
