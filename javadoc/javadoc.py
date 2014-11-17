@@ -12,17 +12,20 @@ class JavaDocRunner:
 		self.source_path = source_path
 
 	def run(self, db_host, db_user, db_pass, db_db):
-		dock_command = __ant_command__ + ["dock",
-			"-Dsource=" + self.source_path,
-			"-Dsource_name=" + self.source_name,
-			"-Dsource_package=" + self.source_package,
-			"-Dsource_url=" + self.source_url,
-			"-Ddb_host=" + db_host,
-			"-Ddb_user=" + db_user,
-			"-Ddb_pass=" + db_pass,
-			"-Ddb_db=" + db_db]
-		print(" ".join(dock_command))
-		call(dock_command)
+		def dir_visitor(arg, directory, files):
+			if directory.endswith("src"):
+				dock_command = __ant_command__ + ["dock",
+					"-Dsource=" + directory,
+					"-Dsource_name=" + self.source_name,
+					"-Dsource_package=" + self.source_package,
+					"-Dsource_url=" + self.source_url,
+					"-Ddb_host=" + db_host,
+					"-Ddb_user=" + db_user,
+					"-Ddb_pass=" + db_pass,
+					"-Ddb_db=" + db_db]
+				print(" ".join(dock_command))
+				call(dock_command)
+		walk(self.source_path, dir_visitor, None)
 
 		# Now, call source for each source file.
 		def dir_visitor(arg, directory, files):
@@ -39,7 +42,6 @@ class JavaDocRunner:
 					"-Ddb_db=" + db_db]
 					print(" ".join(source_command))
 					call(source_command)
-
 		walk(self.source_path, dir_visitor, None)
 
 def main():

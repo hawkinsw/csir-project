@@ -33,8 +33,13 @@
 		</java>
 	</target>
 
+	<path id="docsourcepath">
+		<dirset dir="${source}">
+		</dirset>
+	</path>
+
 	<target name="dock">
-    <javadoc access="private" sourcepath="${source}" packagenames="*">
+    <javadoc access="private" sourcepathref="docsourcepath" packagenames="*">
 			<doclet name="edu.virginia.cs.Doc" pathref="classpath" >
 				<param name="-mysqlhost" value="${db_host}" />
 				<param name="-mysqluser" value="${db_user}" />

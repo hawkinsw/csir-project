@@ -52,7 +52,10 @@ public class Doc extends Doclet {
 		if (!mDb.connect())
 			return false;
 
-		mPackageId = mDb.addPackage(mSourceName, mSourcePackage, mSourceUrl);
+		mPackageId = mDb.getPackageIdFromName(mSourceName);
+		if (mPackageId == -1) {
+			mPackageId = mDb.addPackage(mSourceName, mSourcePackage, mSourceUrl);
+		}
 
 		if (mPackageId == -1) {
 			mDb.disconnect();
