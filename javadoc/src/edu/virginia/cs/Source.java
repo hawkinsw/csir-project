@@ -337,7 +337,7 @@ public class Source extends AbstractProcessor {
 				if (sourceId != -1) {
 					body = new String();
 					for (StatementTree statement : b.getStatements()) {
-						body += statement.toString() + "\n";
+						body += statement.toString() + ";\n";
 					}
 					mDb.updateSource(mPackageId, sourceId, body);
 
