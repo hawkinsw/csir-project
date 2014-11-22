@@ -2,6 +2,9 @@
 
 from subprocess import call
 from os.path import walk
+import tempfile
+import shutil
+
 __doxygen_command__=["/home/hawkinsw/code/csir/project/doxygen/doxygen.pl"]
 __doxygen_prepare_command__=["/home/hawkinsw/code/csir/project/doxygen/prepare_doxygen.pl"]
 __docker_command__=["/home/hawkinsw/code/csir/project/clang/docker"]
@@ -42,6 +45,8 @@ class DoxygenRunner:
 				if f.endswith(".h") or f.endswith(".hpp") or \
 				   f.endswith(".cpp") or f.endswith(".cc") or \
 				   f.endswith(".cxx"):
+					temp_dir = tempfile.mkdtemp()
+					shutil.copyfile(directory + "/" + f, temp_dir + "/" + f)
 					source_command = __docker_command__ + ["-mysqluser",db_user,
 						"-mysqlpass",db_pass,
 						"-mysqldb",db_db,
@@ -50,11 +55,12 @@ class DoxygenRunner:
 						"-sourcepackage",self.source_package,
 						"-sourceurl",self.source_url,
 						"-file",
-						directory + "/" + f,
-						directory + "/" + f,
+						temp_dir + "/" + f,
+						temp_dir + "/" + f,
 						"--"]
 					print(" ".join(source_command))
 					call(source_command)
+					shutil.rmtree(temp_dir)
 
 		walk(self.source_path, dir_visitor, None)
 
