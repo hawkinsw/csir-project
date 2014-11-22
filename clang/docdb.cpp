@@ -266,9 +266,9 @@ bool DocDb::prepareQueries() {
 	try {
 		m_wrapper->addPackageQuery = new Query(m_wrapper->con);
 		(*m_wrapper->addPackageQuery) << "INSERT INTO package "
-			"(name, package_file_name, package_url) "
+			"(name, package_file_name, package_url, package_source_language) "
 			"VALUES "
-			"(%0q,%1q,%2q)";
+			"(%0q,%1q,%2q, \"C++\")";
 		m_wrapper->addPackageQuery->parse();
 
 		m_wrapper->addSourceQuery = new Query(m_wrapper->con);

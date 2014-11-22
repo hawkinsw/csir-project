@@ -9,6 +9,7 @@ drop table if exists dependency;
 create table package (
 	id integer not null primary key auto_increment,
 	name varchar(255),
+	package_source_language varchar(255),
 	package_file_name text,
 	package_url text);
 
