@@ -1,0 +1,93 @@
+CSIR/CS6610 Project Implementation Details:
+
+0. DocDb
+The documentation database (DocDB) is the heart of the storage and retrieval mechanism for this project. It holds all the package identifications, documentation, source code, dependencies and connections therein. Packages, documentation, source and dependencies are stored in separate tables and normalized with unique identifiers.
+
+The package table stores information software packages. Each package has four associated fields of metadata:
+1. The name of the package. 
+2. The programming language used by the project
+3. The filename of the package source code 
+4. the URL of the package
+
+(1) is the name of the package as determined by the crawling algorithm. The crawler determines the name of the package depending on how the code is retrieved. In the description of Step (1), Github search, this will become explicit. Field (2), the programming language, is also determined by the crawler. Again, in the description of Step (2), this will be described explicitly. Fields (3) and (4) serve a similar purpose: They identify the original location of the code for later presentation to the system user.
+
+The source table stores information about source code for packages. The DocDB considers three different types of source code: class, namespace and method. While only the identifiers for classes and namespaces are kept in the DocDB, the entire source code of methods are stored. For this reason, the design of the source table is tailored to methods:
+
+1. a link to the package
+2. the type of the source
+3. the name of the object
+4. the return type
+5. the parameter count
+6. the source code itself
+
+Field (1) is a pointer to the package that contains this namespace, class or method. Field (2) is the type of the source code: class, namespace or method. Field (3) is the namespace, class or method name. Fields (4), (5) and (6) are meaningful only for methods. Field (4) is the method return type. Field (5) is the number of method parameters. Although the types and names of parameters are store separately, the parameter count is useful to differentiate polymorphic functions with variable number of parameters. For more information, see Future Work. Field (6) is the source code of the method itself. 
+
+Even though the source code for methods and namespaces are not kept, it is important to store their identifiers in the DocDb for two reasons. First, documentation formats like Doxygen and JavaDoc allow for specific comments at these levelf of abstraction. Second, the identifiers themselves are used as dependency links. More on dependency links below.
+
+The parameter table stores information about the parameters of a particular method. It has four fields:
+
+1. a link to the method
+2. a link to the package
+3. the type of the parameter
+4. the name of the parameter
+
+Field (1) is a pointer to the row in the source table that holds the source code for the method that uses this parameter. Because a function may have multiple parameters, links between the parameter table and source table are many-to-one. Field (2) is a link to the package. This could be derived through Field (1) but holding it here makes later retrieval easier. Field (3) is the type of the parameter and Field (4) is the parameter name.
+
+The dependency table stores information about dependencies between packages. Dependency analysis is performed on methods where each method is determined to depend on zero or more packages or namespaces. The calculation of dependencies is described below in Dependency Analysis. To store the dependencies, the dependency table has four fields:
+
+1. a link to the method
+2. a link to the package
+3. the name of the dependency
+4. a link to the dependency
+
+Field (1) is a pointer to the row in the source table that represents the function that has this dependency. Field (2) is a pointer to the package that contains this method. As in the parameter table, this could be derived through Field (1) but holding it here makes later retrieval easier. Either Field (3) or Field (4) are defined, but not both. Field (3) is the name of a dependency, e.g. "com.android.View". Field (4) is a pointer to the row in the source table that represents the dependency. In other words, if the crawler has analyzed the source code of the "com.android.View" package, all the entries in this table with a dependency on that name would be replaced with a pointer to the appropriate row in the source table. Please see the Github Crawler and Dependency Analysis for more information about the utility of these fields.
+
+The documentation table stores documentation associated with a source object. The documentation table has four fields:
+
+1. a link to the source
+2. a link to the package
+3. the documentation text
+
+Field (1) is a pointer to the row in the source table whose object is being documented. The object may be a class, namepsace or method. Field (2) is a pointer to the package that contains this method. As in the parameter table, this could be derived through Field (1) but holding it here makes later retrieval easier. Finally, Field (3) contains the text of the documentation itself.
+
+1. Crawler
+
+Given the normalized, language-agnostic design of the DocDb, there are many types of programming projects that can be stored and analyzed. Most existing research on natural language analysis of source code has focused on projects available at Sourceforge, Freshmeat, the Apache Foundation, etc. In this study, our crawler is aimed at Github.
+
+The Github crawler feeds the analyzer by searching the site's popular repositories. Github refers to these as trending repositories and categorizes them by language. In other words, it is possible to search for the trending Javascript repositories or the trending PHP repositories. 
+
+The crawler takes as input the name of a language: Javascript, Java, C++, C, etc. It queries Github for the names of the popular repositories whose source code language matches the user input. Iteratively, the crawler clones each popular repository and passes control to the analyzer.  
+
+2. Analyzer
+
+Source code analysis is performed by an Analyzer. Analyzers are source language-specific and adhere to "Runner" API. This API is implemented in Python. For every repository given to the Analyzer by the Crawler, a language-specific Runner is created. The runner is executed on that repository. The runner is responsible for doing language-appropriate analysis of the code in the repository and properly filling the DocDb. 
+
+Because the Runner is given complete independence over analysing the source code and filling the DocDB, Runners do not need to be written entirely in Python. In fact, the two Runners in existence are written in Java and C++ (to analyze projects written in those languages). The API is simply a way of passing information about a repository from the Crawler to an instantiation of the Analyzer.
+
+(Diagram: The Runner API)
+
+2.1 The Java Runner
+
+The Java Runner is implemented in Java and uses the standard Doclet and JavaCompiler API. Analysis of projects in Java using the Java Runner proceeds in two steps: First, JavaDocker stores source code documentation in the DocDB. Second, JavaSource stores the source of the project in the DocDB. In the process, if there is documentation associated with that source code, the two are linked. The python that implements the Runner API simply calls out to JavaDocker and JavaSource.
+
+JavaDocker implements the Doclet API, and gets programmatic access to all comments in the source code that adhere to the JavaDoc syntax. This means that comments available to the JavaDocker are associated with a particular package, class or method. The JavaDocker inserts the documentation into the Documentation table and associates it with a source "stub" that contains the source name (and perhaps return type and parameters, in the case of a method). 
+
+JavaSource implements several APIs that allow the tool to programmatically invoke the Java compiler and traverse the resulting abstract syntax tree. As each Java file is parsed by JavaSource, the classes and methods are extracted. Each of these is inserted into the database by either updating an existing entry or adding a new row. Existing entries are updated when the class or method was previously inserted by JavaDocker. Entries are inserted when the class or method has never been seen before (which implies that it is not documented according to JavaDoc standards). 
+
+To calculate dependencies, JavaSource pays attention to import statements. By convention, in Java import statements affect an entire .java file. Packages are imported at the top of the file and those packages are used throughout. For each .java file, JavaSource compiles these imports into a list. Then, for each method seen in that source file, those packages are considered dependencies. Dependencies are added into the Dependency table by name when the dependent namespace does not exist in the DocDB. If the dependency already exists in the DocDb, the ID for that source code is used as the link instead of the name. While it is certainly not the case that each method depends on each one of those packages, it is is still a meaningful approximation.
+
+In the course of traversing the AST, JavaSource also looks for package declarations. These declarations are the satisfying end of a dependency relationship. When a package is declared, the dependency table is updated to reflect the fact that code satisfying the dependency has been analyzed and now exists in the DocDb.
+
+2.2 The Cpp Runner
+
+The analyzer for projects written in C++ is implemented in PERL (using a Doxygen API) and C++ (using Clang). As in the case of the Java Runner, analysis of projects written in C++ using the C++ Runner proceeds in two steps: First, CppDocker stores source code documentation in the DocDB. Second, CppSource stores the source of the project in the DocDB. In the process, if there is documentation associated with that source code, the two are linked. The python that implements the Runner API simply calls out to CppDocker and CppSource.
+
+CppDocker invokes Doxygen on the entire set of files in the project. Doxygen considers only those files that are code (headers or implementation) and skips everything else. When invoked, Doxygen is configured to output its documentation in a special PERL module format. CppDocker includes these modules to programmatically iterate through generated documentation for methods, classes, namespaces, etc. Like JavaDocker, when CppDocker inserts documentation for source code, it also creates and inserts a stub source object. Depending on what is available from the output of Doxygen, these stubs have information about parameters, return types, etc. 
+
+CppSource is written as a Clang front end action. Front end actions are types of tools that can use the output from the Clang compiler programatically. CppSource traverses the abstract syntax tree for each of the source files and finds class and method declarations. Entries for these declarations are either updated or inserted in to the Source table of the DocDb. Existing entries are updated when the class or method was previously inserted by CppDocker. Entries are inserted when the class or method has never been seen before (which implies that it is not documented according to Doxygen standards). 
+
+To calculate dependencies, CppSource pays attention to using namespace statements. Although not strictly necessary, C++ using namespace statements affect an entire scope and programmers typically invoke them at the top of source files. For each C++ file (implementation or header), CppSource compiles these namespaces into a list. Then, for each method seen in that source file, those namespaces are considered dependencies. Dependencies are added into the Dependency table by name when the dependent namespace does not exist in the DocDB. If the dependency already exists in the DocDb, the ID for that source code is used as the link instead of the name. Again, although it is certainly not the case that each method depends on each one of those namespaces, it is is still a meaningful approximation.
+
+In the course of traversing the AST, CppSource also looks for namespace declarations. These declarations are the satisfying end of a dependency relationship. When a namespace is declared, the dependency table is updated to reflect the fact that code satisfying the dependency has been analyzed and now exists in the DocDb.
+
+4. data flow analysis
