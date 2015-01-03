@@ -5,9 +5,9 @@ from os.path import walk
 import tempfile
 import shutil
 
-__doxygen_command__=["/home/hawkinsw/code/csir/project/doxygen/doxygen.pl"]
-__doxygen_prepare_command__=["/home/hawkinsw/code/csir/project/doxygen/prepare_doxygen.pl"]
-__docker_command__=["/home/hawkinsw/code/csir/project/clang/docker"]
+__doxygen_command__=["/home/hawkinsw/code/csir/project/languages/cpp/doxygen/doxygen.pl"]
+__doxygen_prepare_command__=["/home/hawkinsw/code/csir/project/languages/cpp/doxygen/prepare_doxygen.pl"]
+__docker_command__=["/home/hawkinsw/code/csir/project/languages/cpp/clang/docker"]
 
 class DoxygenRunner:
 	def __init__(self, source_name, source_package, source_url, source_path):

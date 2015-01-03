@@ -2,7 +2,7 @@
 
 from subprocess import call
 from os.path import walk
-__ant_command__=["/usr/bin/ant", "-f","/home/hawkinsw/code/csir/project/javadoc/run.xml"]
+__ant_command__=["/usr/bin/ant", "-f","/home/hawkinsw/code/csir/project/languages/java/run.xml"]
 
 class JavaDocRunner:
 	def __init__(self, source_name, source_package, source_url, source_path):

@@ -14,4 +14,4 @@ $db_db = shift;
 
 $directory = quotemeta quotemeta $directory;
 
-system("sed s/__ID__/$directory/ doxygen/doxygen.cfg | sed s/__OD__/$directory/ | /usr/bin/doxygen -");
+system("sed s/__ID__/$directory/ languages/cpp/doxygen/doxygen.cfg | sed s/__OD__/$directory/ | /usr/bin/doxygen -");
