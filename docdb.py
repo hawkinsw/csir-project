@@ -15,9 +15,67 @@ class DocDb:
 		self.unresolved_query = ("SELECT DISTINCT(depends_on_name) AS dependency "
 			"FROM dependency WHERE "
 			"depends_on_name!=\"\"")
-		self.package_exists = ("SELECT id FROM package WHERE name=%s")
-
+		self.package_exists_query = ("SELECT id FROM package WHERE name=%s")
+		self.source_for_package_query=("SELECT id "
+			"FROM source "
+			"WHERE package_id=%s "
+			"AND type=\"method\"")
+		self.code_for_source_query=("SELECT source, name FROM source WHERE id=%s")
+		self.update_relationship_count_query=(
+			"UPDATE synonyms "
+			"SET count=count+1 "
+			"WHERE (word1=%(word1)s and word2=%(word2)s) or "
+			"(word1=%(word2)s and word2=%(word1)s) AND "
+			"package_id=%(package_id)s")
+		self.add_relationship_query=(
+			"INSERT INTO synonyms "
+			"(package_id, count, word1, word2) "
+			"VALUES "
+			"(%s, 1, %s, %s)")
 		return True
+
+	def addWordRelationship(self, package_id, word1, word2):
+		if not self.connected:
+			return (None, None)
+		cursor = self.connection.cursor()
+		cursor.execute(self.update_relationship_count_query,
+		{'package_id': package_id,
+		 'word1': word1,
+		 'word2': word2,})
+
+		cursor.fetchone()
+		if cursor.rowcount == 0:
+			insert_cursor = self.connection.cursor()
+			insert_cursor.execute(self.add_relationship_query,
+				(package_id, word1, word2))
+			insert_cursor.close()
+		cursor.close()
+		self.connection.commit()
+
+	def sourceForSource(self, source_id):
+		source = None
+		method_name = None
+		if not self.connected:
+			return (None, None)
+		cursor = self.connection.cursor()
+		cursor.execute(self.code_for_source_query, (source_id,))
+		(source, method_name) = cursor.fetchone()
+		cursor.close()
+
+		return (source, method_name)
+
+	def sourceForPackage(self, package_id):
+		sources = []
+		if not self.connected:
+			return sources
+		cursor = self.connection.cursor()
+		cursor.execute(self.source_for_package_query, (package_id,))
+
+		for (source,) in cursor:
+			sources.append(source)
+		cursor.close()
+
+		return sources
 
 	def connect(self):
 		try:
@@ -40,7 +98,7 @@ class DocDb:
 			return exists
 		cursor = self.connection.cursor()
 
-		cursor.execute(self.package_exists, (package_name,))
+		cursor.execute(self.package_exists_query, (package_name,))
 		cursor.fetchone()
 		if cursor.rowcount!=-1:
 			exists = True
