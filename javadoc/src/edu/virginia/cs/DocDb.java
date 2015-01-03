@@ -23,13 +23,19 @@ public class DocDb {
 	private PreparedStatement mGetGlobalSourceIdStmt = null;
 	private PreparedStatement mUpdateSourceStmt = null;
 	private PreparedStatement mInsertParameterStmt = null;
+	private PreparedStatement mInsertParentNameStmt = null;
+	private PreparedStatement mInsertParentIdStmt = null;
 	private PreparedStatement mInsertDependencyNameStmt = null;
 	private PreparedStatement mInsertDependencyIdStmt = null;
 	private PreparedStatement mUpdateDependencyIdStmt = null;
+	private PreparedStatement mUpdateParentIdStmt = null;
 
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
 	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?)";
+	private static final String INSERT_PARENT_NAME_SQL = "INSERT INTO parents (package_id, source_id, parent_name) VALUES (?,?,?)";
+	private static final String INSERT_PARENT_ID_SQL = "INSERT INTO parents (package_id, source_id, parent_id) VALUES (?,?,?)";
+	private static final String UPDATE_PARENT_ID_SQL = "UPDATE parents SET parent_id=?, parent_name=\"\" WHERE parent_name=?";
 	private static final String SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
 	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=? and parameter_count=?";
 	private static final String SELECT_GLOBAL_SOURCE_ID_SQL = "SELECT id FROM source WHERE name=?";
@@ -98,6 +104,12 @@ public class DocDb {
 				Statement.RETURN_GENERATED_KEYS);
 			mUpdateDependencyIdStmt = mSqlConnection.prepareStatement(
 				UPDATE_DEPENDENCY_ID_SQL);
+			mInsertParentNameStmt = mSqlConnection.prepareStatement(
+				INSERT_PARENT_NAME_SQL);
+			mInsertParentIdStmt = mSqlConnection.prepareStatement(
+				INSERT_PARENT_ID_SQL);
+			mUpdateParentIdStmt = mSqlConnection.prepareStatement(
+				UPDATE_PARENT_ID_SQL);
 		} catch (SQLException e) {
 			mIsConnected = false;
 		}
@@ -207,6 +219,80 @@ public class DocDb {
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
 			return -1;
+		}
+	}
+
+	public boolean addParentName(int packageId, int sourceId, String parentName) {
+		if (!mIsConnected) return false;
+		int existingParentId = -1;
+
+		existingParentId = getGlobalSourceIdFromName(parentName);
+
+		if (existingParentId != -1) {
+			return addParentId(packageId, sourceId, existingParentId);
+		}
+
+		try {
+			mInsertParentNameStmt.clearParameters();
+			mInsertParentNameStmt.setInt(1, packageId);
+			mInsertParentNameStmt.setInt(2, sourceId);
+			mInsertParentNameStmt.setString(3, parentName);
+
+			/*
+			 * Yes, this returns a boolean, but it's meaning
+			 * is useless in determining if this statement
+			 * was successful. Disregard.
+			 */
+			mInsertParentNameStmt.execute();
+
+			return true;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return false;
+		}
+	}
+
+	public boolean addParentId(int packageId, int sourceId, int parentId) {
+		if (!mIsConnected) return false;
+		try {
+			mInsertParentIdStmt.clearParameters();
+			mInsertParentIdStmt.setInt(1, packageId);
+			mInsertParentIdStmt.setInt(2, sourceId);
+			mInsertParentIdStmt.setInt(3, parentId);
+
+			/*
+			 * Yes, this returns a boolean, but it's meaning
+			 * is useless in determining if this statement
+			 * was successful. Disregard.
+			 */
+			mInsertParentIdStmt.execute();
+			return true;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return false;
+		}
+	}
+
+	public boolean updateParentId(String parentName, int parentId) {
+		if (!mIsConnected) return false;
+		try {
+			System.err.println("Attempting to update parent: " + parentName + " -> " + parentId);
+
+			mUpdateParentIdStmt.clearParameters();
+			mUpdateParentIdStmt.setInt(1, parentId);
+			mUpdateParentIdStmt.setString(2, parentName);
+
+			/*
+			 * Yes, this returns a boolean, but it's meaning
+			 * is useless in determining if this statement
+			 * was successful. Disregard.
+			 */
+			mUpdateParentIdStmt.execute();
+
+			return true;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return false;
 		}
 	}
 

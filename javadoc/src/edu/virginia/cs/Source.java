@@ -7,6 +7,8 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.tree.StatementTree;
 import com.sun.source.tree.ClassTree;
@@ -16,6 +18,7 @@ import com.sun.source.tree.CompilationUnitTree;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.io.IOException;
 import java.io.File;
@@ -181,12 +184,15 @@ public class Source extends AbstractProcessor {
 			ClassVisitor classVisitor = new ClassVisitor();
 			TreePath treePath = m_trees.getPath(e);
 			List<String> dependencies = null;
+			List<String> imports = null;
 
+			imports = calculateImportsFromPath(treePath);
 			dependencies = calculateDependenciesFromPath(treePath);
 
 			classVisitor.setDocDb(db);
 			classVisitor.setPackageId(packageId);
 			classVisitor.setDependencies(dependencies);
+			classVisitor.setImports(imports);
 			classVisitor.scan(treePath, mElementUtils.getPackageOf(e).toString());
 
 			visitor.setDocDb(db);
@@ -202,11 +208,20 @@ public class Source extends AbstractProcessor {
 	private Trees m_trees;
 	private Types m_typeUtils;
 
-	private List<String> calculateDependenciesFromPath(TreePath tp) {
+	private List<String> calculateImportsFromPath(TreePath tp) {
 		CompilationUnitTree cpuTree = tp.getCompilationUnit();
-		LinkedList<String> dependencies = new LinkedList<String>();
+		LinkedList<String> imports = new LinkedList<String>();
 		for (ImportTree importTree : cpuTree.getImports()) {
 			String importName = importTree.getQualifiedIdentifier().toString();
+			imports.add(importName);
+		}
+		Collections.sort(imports);
+		return imports;
+	}
+
+	private List<String> calculateDependenciesFromPath(TreePath tp) {
+		LinkedList<String> dependencies = new LinkedList<String>();
+		for (String importName : calculateImportsFromPath(tp)) {
 			if (!importName.startsWith("java.") &&
 			    !importName.startsWith("com.sun.") &&
 			    !importName.startsWith("javax."))
@@ -217,6 +232,7 @@ public class Source extends AbstractProcessor {
 
 	private class ClassVisitor extends TreePathScanner<Object,String> {
 		private List<String> mDependencies = null;
+		private List<String> mImports = null;
 		private int mPackageId = -1;
 		private DocDb mDb = null;
 
@@ -224,6 +240,9 @@ public class Source extends AbstractProcessor {
 			mDependencies = dependencies;
 		}
 
+		public void setImports(List<String> imports) {
+			mImports = imports;
+		}
 		public void setPackageId(int packageId) {
 			mPackageId = packageId;
 		}
@@ -234,12 +253,45 @@ public class Source extends AbstractProcessor {
 
 		public Object visitClass(ClassTree classNode, String nameQualification) {
 			String clazz = classNode.getSimpleName().toString();
+			boolean hasParent = false;
+			String parentName = null;
+
+			/*
+			 * Find the full name of the class being extended, if applicable.
+			 */
+			if (classNode.getExtendsClause() != null) {
+				/*
+				 * Get the basic name first.
+				 */
+				Tree extendsClauseTree = classNode.getExtendsClause();
+				String extendsClauseName = "";
+				if (extendsClauseTree.getKind() == Tree.Kind.IDENTIFIER) {
+					IdentifierTree extendsClauseIdentifierTree = 
+						(IdentifierTree)extendsClauseTree;
+					extendsClauseName = extendsClauseIdentifierTree.getName().toString();
+				} else if(extendsClauseTree.getKind() == Tree.Kind.PARAMETERIZED_TYPE){
+					ParameterizedTypeTree extendsClausePTree = 
+						(ParameterizedTypeTree)extendsClauseTree;
+
+					extendsClauseName = extendsClausePTree.getType().toString();
+				}
+				/*
+				 * Iterate through the imported packages, to resolve
+				 * this to a fully-qualified name.
+				 */
+				for (String importName : mImports) {
+					if (importName.endsWith(extendsClauseName)) {
+						parentName = importName;
+						hasParent = true;
+						break;
+					}
+				}
+			}
 
 			/*
 			 * Skip anonymous inner classes.
 			 */
-			if (clazz.equals(""))
-			{
+			if (clazz.equals("")) {
 				System.err.println("Skipping inner class.");
 				return super.visitClass(classNode, nameQualification);
 			}
@@ -271,6 +323,15 @@ public class Source extends AbstractProcessor {
 						System.err.println("Adding dependency on " + dependencyName);
 						mDb.addDependencyName(mPackageId, sourceId, dependencyName);
 					}
+
+					/*
+					 * update any parents that might point here.
+					 */
+					mDb.updateParentId(clazz, sourceId);
+					/*
+					 * Create any necessary parent relationships.
+					 */
+					if (hasParent) mDb.addParentName(mPackageId, sourceId, parentName);
 				}
 			}
 			return super.visitClass(classNode, nameQualification);
