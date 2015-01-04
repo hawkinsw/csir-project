@@ -146,12 +146,13 @@ public class Doc extends Doclet {
 	 *
 	 * Parse method comments and insert them into the database.
 	 */
-	private void handleMethods(MethodDoc methodDocs[], int indent) {
+	private void handleMethods(int classId, MethodDoc methodDocs[], int indent) {
 		for (MethodDoc methodDoc : methodDocs) {
 			printIndent(indent+1);
 			System.out.println("method: " + methodDoc.qualifiedName());
-			int sourceId = mDb.addSource(mPackageId, 
+			int sourceId = mDb.addSource(mPackageId,
 				"method",
+				classId,
 				methodDoc.returnType().toString(),
 				methodDoc.qualifiedName(),
 				methodDoc.parameters().length,
@@ -165,23 +166,37 @@ public class Doc extends Doclet {
 	private void handleClass(ClassDoc classDoc, int indent) {
 		System.out.println("class: " + classDoc.toString());
 
+		/*
+		 * Add the class itself!
+		 */
+		int classId = mDb.addSource(mPackageId,
+			"class",
+			0,
+			"",
+			classDoc.qualifiedName(),
+			0,
+			"");
+		if (classId != -1) {
+			mDb.addParentName(mPackageId, classId, classDoc.superclass().qualifiedName());
+		}
+
 		for (ConstructorDoc constructorDoc : classDoc.constructors()) {
 			printIndent(indent+1);
 			System.out.println("constructor: " + constructorDoc.qualifiedName());
 
-			int sourceId = mDb.addSource(mPackageId, 
-				"class",
-				"",
+			int sourceId = mDb.addSource(mPackageId,
+				"method",
+				classId,
+				classDoc.qualifiedName(),
 				constructorDoc.qualifiedName(),
-				0,
+				constructorDoc.parameters().length,
 				"");
 
 			if (sourceId != -1)
 				mDb.addDocumentation(mPackageId,sourceId,constructorDoc.commentText());
 		}
-
 		if (true) {
-			handleMethods(classDoc.methods(), indent+1);
+			handleMethods(classId, classDoc.methods(), indent+1);
 		}
 
 		if (false) {

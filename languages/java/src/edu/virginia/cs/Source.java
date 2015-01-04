@@ -306,7 +306,19 @@ public class Source extends AbstractProcessor {
 					/*
 					 * Put in this source if we need to.
 					 */
-					sourceId = mDb.addSource(mPackageId, "class", "", clazz, 0, "");
+					sourceId = mDb.addSource(mPackageId, "class", 0, "", clazz, 0, "");
+
+					/*
+					 * Even though we just added it, there could have
+					 * been a database error.
+					 */
+					if (sourceId != -1 && hasParent) {
+						/*
+						 * Create any necessary parent relationships.
+						 */
+						System.err.println("Adding parent name in Source: " + parentName);
+						mDb.addParentName(mPackageId, sourceId, parentName);
+					}
 				}
 				/*
 				 * Even though we just added it, there could have
@@ -324,15 +336,11 @@ public class Source extends AbstractProcessor {
 						System.err.println("Adding dependency on " + dependencyName);
 						mDb.addDependencyName(mPackageId, sourceId, dependencyName);
 					}
-
 					/*
 					 * update any parents that might point here.
 					 */
 					mDb.updateParentId(clazz, sourceId);
-					/*
-					 * Create any necessary parent relationships.
-					 */
-					if (hasParent) mDb.addParentName(mPackageId, sourceId, parentName);
+
 				}
 			}
 			return super.visitClass(classNode,
@@ -372,7 +380,6 @@ public class Source extends AbstractProcessor {
 
 		private String fullExecutableName(ExecutableElement e) {
 			String name = e.getSimpleName().toString();
-
 			if (!name.contains(".")) {
 				name = mUtils.getPackageOf(e) + getEnclosingElements(e) + "." + name;
 			}
@@ -386,6 +393,7 @@ public class Source extends AbstractProcessor {
 		public Object visitExecutable(ExecutableElement execElement, Trees trees) {
 			if (mDb != null && mPackageId != -1) {
 				int sourceId = -1;
+				int classId = -1;
 				MethodTree execTree = null;
 				BlockTree b = null;
 				String body = null;
@@ -410,7 +418,8 @@ public class Source extends AbstractProcessor {
 					/*
 					 * Put in this source if we need to.
 					 */
-					sourceId = mDb.addSource(mPackageId, "method", "", methodName, parameterCount, "");
+					classId = mDb.getSourceIdFromName(mPackageId, className(execElement), 0);
+					sourceId = mDb.addSource(mPackageId, "method", classId, "", methodName, parameterCount, "");
 				}
 
 				if (sourceId != -1) {

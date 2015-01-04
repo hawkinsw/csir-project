@@ -32,7 +32,7 @@ public class DocDb {
 
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
-	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?)";
+	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, member_id, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?,?)";
 	private static final String INSERT_PARENT_NAME_SQL = "INSERT INTO parents (package_id, source_id, parent_name) VALUES (?,?,?)";
 	private static final String INSERT_PARENT_ID_SQL = "INSERT INTO parents (package_id, source_id, parent_id) VALUES (?,?,?)";
 	private static final String UPDATE_PARENT_ID_SQL = "UPDATE parents SET parent_id=?, parent_name=\"\" WHERE parent_name=?";
@@ -379,16 +379,17 @@ public class DocDb {
 		}
 	}
 
-	public int addSource(int packageId, String type, String returnType, String name, int parameterCount, String code) {
+	public int addSource(int packageId, String type, int memberId, String returnType, String name, int parameterCount, String code) {
 		if (!mIsConnected) return -1;
 		try {
 			mInsertSourceStmt.clearParameters();
 			mInsertSourceStmt.setInt(1, packageId);
 			mInsertSourceStmt.setString(2, type);
-			mInsertSourceStmt.setString(3, returnType);
-			mInsertSourceStmt.setString(4, name);
-			mInsertSourceStmt.setInt(5, parameterCount);
-			mInsertSourceStmt.setString(6, code);
+			mInsertSourceStmt.setInt(3, memberId);
+			mInsertSourceStmt.setString(4, returnType);
+			mInsertSourceStmt.setString(5, name);
+			mInsertSourceStmt.setInt(6, parameterCount);
+			mInsertSourceStmt.setString(7, code);
 
 			/*
 			 * Yes, this returns a boolean, but it's meaning
