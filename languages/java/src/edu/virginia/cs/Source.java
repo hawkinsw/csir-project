@@ -31,6 +31,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.Name;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -193,7 +194,7 @@ public class Source extends AbstractProcessor {
 			classVisitor.setPackageId(packageId);
 			classVisitor.setDependencies(dependencies);
 			classVisitor.setImports(imports);
-			classVisitor.scan(treePath, mElementUtils.getPackageOf(e).toString());
+			classVisitor.scan(treePath, e.getEnclosingElement().toString());
 
 			visitor.setDocDb(db);
 			visitor.setPackageId(packageId);
@@ -292,7 +293,7 @@ public class Source extends AbstractProcessor {
 			 * Skip anonymous inner classes.
 			 */
 			if (clazz.equals("")) {
-				System.err.println("Skipping inner class.");
+				System.err.println("Skipping anonymous inner classes.");
 				return super.visitClass(classNode, nameQualification);
 			}
 
@@ -334,7 +335,8 @@ public class Source extends AbstractProcessor {
 					if (hasParent) mDb.addParentName(mPackageId, sourceId, parentName);
 				}
 			}
-			return super.visitClass(classNode, nameQualification);
+			return super.visitClass(classNode,
+				nameQualification + "." + classNode.getSimpleName().toString());
 		}
 	}
 
@@ -356,13 +358,29 @@ public class Source extends AbstractProcessor {
 			mUtils = utils;
 		}
 
+		private String getEnclosingElements(Element e) {
+			Element encl = e.getEnclosingElement();
+			if (encl == null) return "";
+			else if (encl instanceof PackageElement) return "";
+			else {
+				System.err.println("Simple name: " + encl.getSimpleName().toString());
+				return getEnclosingElements(encl) +
+				"." +
+				encl.getSimpleName().toString();
+			}
+		}
+
 		private String fullExecutableName(ExecutableElement e) {
 			String name = e.getSimpleName().toString();
 
 			if (!name.contains(".")) {
-				name = mUtils.getPackageOf(e) + "." + e.getEnclosingElement().getSimpleName() + "." + name;
+				name = mUtils.getPackageOf(e) + getEnclosingElements(e) + "." + name;
 			}
 			return name;
+		}
+
+		private String className(ExecutableElement e) {
+			return mUtils.getPackageOf(e) + "." + e.getEnclosingElement().getSimpleName();
 		}
 
 		public Object visitExecutable(ExecutableElement execElement, Trees trees) {
