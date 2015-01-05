@@ -9,6 +9,11 @@
     <pathelement location="/usr/lib/jvm/java-7-openjdk-amd64/lib/tools.jar"/>
 	</path>
 
+	<path id="lucene-classpath">
+		<pathelement location="/home/hawkinsw/code/csir/lucene/lucene-4.10.3/core/lucene-core-4.10.3.jar" />
+		<pathelement location="/home/hawkinsw/code/csir/lucene/lucene-4.10.3/analysis/common/lucene-analyzers-common-4.10.3.jar" />
+	</path>
+
 	<target name="clean">
 		<delete dir="${build}/classes" includes="**/*.class"/>
 		<delete file="Docker.jar"/>
@@ -18,11 +23,34 @@
 		<mkdir dir="${build}"/>
 		<mkdir dir="${build}/classes"/>
 		<javac srcdir="${src}" destdir="${build}/classes" debug="true">
+			<classpath>
+				<path refid="lucene-classpath"/>
+			</classpath>
 		</javac>
 	</target>
 
 	<target name="jar" depends="build">
 		<jar destfile="Docker.jar" basedir="${build}/classes"/>
+	</target>
+
+	<target name="build-index" depends="jar" >
+		<java classname="edu.virginia.cs.DocDbIndexWriter">
+			<arg value="-index" />
+			<arg value="/tmp/index1" />
+			<arg value="-mysqlhost" />
+			<arg value="localhost" />
+			<arg value="-mysqluser"/>
+			<arg value="ir" />
+			<arg value="-mysqlpass"/>
+			<arg value="ir" />
+			<arg value="-mysqldb" />
+			<arg value="ir" />
+
+			<classpath>
+				<path refid="classpath"/>
+				<path refid="lucene-classpath"/>
+			</classpath>
+		</java>
 	</target>
 
 	<target name="source" depends="jar" >
