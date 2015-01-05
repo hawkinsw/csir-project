@@ -178,6 +178,7 @@ public class Doc extends Doclet {
 			"");
 		if (classId != -1) {
 			mDb.addParentName(mPackageId, classId, classDoc.superclass().qualifiedName());
+			mDb.addDocumentation(mPackageId, classId, classDoc.commentText());
 		}
 
 		for (ConstructorDoc constructorDoc : classDoc.constructors()) {
