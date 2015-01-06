@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.PreparedStatement;
+import java.sql.CallableStatement;
 import java.sql.ResultSet;
 
 public class DocDb {
@@ -29,7 +30,9 @@ public class DocDb {
 	private PreparedStatement mInsertDependencyIdStmt = null;
 	private PreparedStatement mUpdateDependencyIdStmt = null;
 	private PreparedStatement mUpdateParentIdStmt = null;
+	private CallableStatement mGetParentsStmt = null;
 
+	private static final String CALL_PARENTS_LIST_SQL = "{call parent_list(?)}";
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
 	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, member_id, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?,?)";
@@ -110,6 +113,8 @@ public class DocDb {
 				INSERT_PARENT_ID_SQL);
 			mUpdateParentIdStmt = mSqlConnection.prepareStatement(
 				UPDATE_PARENT_ID_SQL);
+			mGetParentsStmt = mSqlConnection.prepareCall(
+				CALL_PARENTS_LIST_SQL);
 		} catch (SQLException e) {
 			mIsConnected = false;
 		}
@@ -133,6 +138,43 @@ public class DocDb {
 				e.toString());
 		}
 		return id;
+	}
+
+	public int[] getParentsFromId(int sourceId) {
+		if (!mIsConnected) return new int[0];
+		try {
+			ResultSet listRs = null;
+			String parentsList = null;
+			String parsedParentsList[];
+			int parents[];
+			int counter = 0;
+
+			mGetParentsStmt.clearParameters();
+			mGetParentsStmt.setInt(1, sourceId);
+
+			mGetParentsStmt.execute();
+
+			listRs = mGetParentsStmt.getResultSet();
+			if (listRs.next()) {
+				parentsList = listRs.getString(1);
+			}
+
+			if (listRs != null) {
+				listRs.close();
+			}
+
+			parsedParentsList = parentsList.split(",");
+			parents = new int[parsedParentsList.length];
+			for (String parent : parsedParentsList) {
+				parents[counter] = Integer.parseInt(parent);
+				counter++;
+			}
+
+			return parents;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new int[0];
+		}
 	}
 
 	public int getPackageIdFromName(String name) {
