@@ -18,9 +18,11 @@ public class DocDb {
 	private Connection mSqlConnection = null;
 	private PreparedStatement mInsertPackageStmt = null;
 	private PreparedStatement mInsertDocumentationStmt = null;
+	private PreparedStatement mGetDocumentationStmt = null;
 	private PreparedStatement mInsertSourceStmt = null;
 	private PreparedStatement mGetPackageIdStmt = null;
 	private PreparedStatement mGetSourceIdStmt = null;
+	private PreparedStatement mGetSourceStmt = null;
 	private PreparedStatement mGetGlobalSourceIdStmt = null;
 	private PreparedStatement mUpdateSourceStmt = null;
 	private PreparedStatement mInsertParameterStmt = null;
@@ -31,22 +33,26 @@ public class DocDb {
 	private PreparedStatement mUpdateDependencyIdStmt = null;
 	private PreparedStatement mUpdateParentIdStmt = null;
 	private CallableStatement mGetParentsStmt = null;
+	private PreparedStatement mGetMemberIdStmt = null;
 
 	private static final String CALL_PARENTS_LIST_SQL = "{call parent_list(?)}";
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
 	private static final String INSERT_DOCUMENTATION_SQL = "INSERT INTO documentation (package_id, source_id, documentation) VALUES (?,?,?)";
+	private static final String SELECT_DOCUMENTATION_SQL = "SELECT documentation from documentation where source_id=?";
 	private static final String INSERT_SOURCE_SQL = "INSERT INTO source (package_id, type, member_id, return_type, name, parameter_count, source) VALUES (?,?,?,?,?,?,?)";
 	private static final String INSERT_PARENT_NAME_SQL = "INSERT INTO parents (package_id, source_id, parent_name) VALUES (?,?,?)";
 	private static final String INSERT_PARENT_ID_SQL = "INSERT INTO parents (package_id, source_id, parent_id) VALUES (?,?,?)";
 	private static final String UPDATE_PARENT_ID_SQL = "UPDATE parents SET parent_id=?, parent_name=\"\" WHERE parent_name=?";
 	private static final String SELECT_PACKAGE_ID_SQL = "SELECT id FROM package WHERE name=?";
 	private static final String SELECT_SOURCE_ID_SQL = "SELECT id FROM source WHERE package_id=? and name=? and parameter_count=?";
+	private static final String SELECT_SOURCE_SQL = "SELECT source FROM source WHERE id=?";
 	private static final String SELECT_GLOBAL_SOURCE_ID_SQL = "SELECT id FROM source WHERE name=?";
 	private static final String UPDATE_SOURCE_SQL = "UPDATE source SET source=? WHERE package_id=? and id=?";
 	private static final String INSERT_PARAMETER_SQL = "INSERT INTO parameter (package_id, source_id, type, name) VALUES (?,?,?,?)";
 	private static final String INSERT_DEPENDENCY_NAME_SQL = "INSERT INTO dependency (package_id, source_id, depends_on_name) VALUES (?,?,?)";
 	private static final String INSERT_DEPENDENCY_ID_SQL = "INSERT INTO dependency (package_id, source_id, depends_on_id) VALUES (?,?,?)";
 	private static final String UPDATE_DEPENDENCY_ID_SQL = "UPDATE dependency SET depends_on_id=?, depends_on_name=\"\" WHERE depends_on_name=?";
+	private static final String SELECT_MEMBER_ID_SQL = "SELECT member_id FROM source WHERE id=?";
 
 	public DocDb(String mysqlHost,
 		String mysqlUser,
@@ -92,6 +98,8 @@ public class DocDb {
 				SELECT_PACKAGE_ID_SQL);
 			mGetSourceIdStmt = mSqlConnection.prepareStatement(
 				SELECT_SOURCE_ID_SQL);
+			mGetSourceStmt = mSqlConnection.prepareStatement(
+				SELECT_SOURCE_SQL);
 			mGetGlobalSourceIdStmt = mSqlConnection.prepareStatement(
 				SELECT_GLOBAL_SOURCE_ID_SQL);
 			mUpdateSourceStmt = mSqlConnection.prepareStatement(
@@ -115,6 +123,10 @@ public class DocDb {
 				UPDATE_PARENT_ID_SQL);
 			mGetParentsStmt = mSqlConnection.prepareCall(
 				CALL_PARENTS_LIST_SQL);
+			mGetDocumentationStmt = mSqlConnection.prepareStatement(
+				SELECT_DOCUMENTATION_SQL);
+			mGetMemberIdStmt = mSqlConnection.prepareStatement(
+				SELECT_MEMBER_ID_SQL);
 		} catch (SQLException e) {
 			mIsConnected = false;
 		}
@@ -140,6 +152,32 @@ public class DocDb {
 		return id;
 	}
 
+	public String getDocumentationFromSourceId(int sourceId) {
+		if (!mIsConnected) return null;
+		try {
+			ResultSet documentationRs = null;
+			String documentation = null;
+
+			mGetDocumentationStmt.clearParameters();
+			mGetDocumentationStmt.setInt(1, sourceId);
+
+			mGetDocumentationStmt.execute();
+
+			documentationRs = mGetDocumentationStmt.getResultSet();
+			if (documentationRs.next()) {
+				documentation = documentationRs.getString(1);
+			}
+
+			if (documentationRs != null) {
+				documentationRs.close();
+			}
+
+			return documentation;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return null;
+		}
+	}
 	public int[] getParentsFromId(int sourceId) {
 		if (!mIsConnected) return new int[0];
 		try {
@@ -229,6 +267,60 @@ public class DocDb {
 			}
 
 			return id;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return -1;
+		}
+	}
+
+	public String getSourceFromSourceId(int sourceId) {
+		if (!mIsConnected) return null;
+		try {
+			ResultSet sourceRs = null;
+			String source = null;
+
+			mGetSourceStmt.clearParameters();
+			mGetSourceStmt.setInt(1, sourceId);
+
+			mGetSourceStmt.execute();
+
+			sourceRs = mGetSourceStmt.getResultSet();
+			if (sourceRs.next()) {
+				source = sourceRs.getString(1);
+			}
+
+			if (sourceRs != null) {
+				sourceRs.close();
+			}
+
+			return source;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return null;
+		}
+	}
+
+	public int getMemberIdFromSourceId(int sourceId) {
+		if (!mIsConnected) return -1;
+		try {
+			ResultSet memberRs = null;
+			int memberId = -1;
+
+			mGetMemberIdStmt.clearParameters();
+			mGetMemberIdStmt.setInt(1, sourceId);
+
+			mGetMemberIdStmt.execute();
+
+			memberRs = mGetMemberIdStmt.getResultSet();
+			if (memberRs.next()) {
+				memberId = memberRs.getInt(1);
+			}
+
+			if (memberRs != null) {
+				memberRs.close();
+			}
+
+			return memberId;
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
 			return -1;
