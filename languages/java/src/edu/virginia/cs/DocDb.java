@@ -34,6 +34,9 @@ public class DocDb {
 	private PreparedStatement mUpdateParentIdStmt = null;
 	private CallableStatement mGetParentsStmt = null;
 	private PreparedStatement mGetMemberIdStmt = null;
+	private PreparedStatement mGetSourceIdsStmt = null;
+	private PreparedStatement mGetIdsCountStmt = null;
+	private PreparedStatement mGetNameStmt = null;
 
 	private static final String CALL_PARENTS_LIST_SQL = "{call parent_list(?)}";
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
@@ -53,7 +56,9 @@ public class DocDb {
 	private static final String INSERT_DEPENDENCY_ID_SQL = "INSERT INTO dependency (package_id, source_id, depends_on_id) VALUES (?,?,?)";
 	private static final String UPDATE_DEPENDENCY_ID_SQL = "UPDATE dependency SET depends_on_id=?, depends_on_name=\"\" WHERE depends_on_name=?";
 	private static final String SELECT_MEMBER_ID_SQL = "SELECT member_id FROM source WHERE id=?";
-
+	private static final String SELECT_SOURCE_IDS_SQL = "SELECT id FROM source"; 
+	private static final String SELECT_IDS_COUNT_SQL = "SELECT count(id) FROM source"; 
+	private static final String SELECT_NAME_SQL = "SELECT name FROM source where id=?"; 
 	public DocDb(String mysqlHost,
 		String mysqlUser,
 		String mysqlPass,
@@ -127,6 +132,13 @@ public class DocDb {
 				SELECT_DOCUMENTATION_SQL);
 			mGetMemberIdStmt = mSqlConnection.prepareStatement(
 				SELECT_MEMBER_ID_SQL);
+			mGetSourceIdsStmt = mSqlConnection.prepareStatement(
+				SELECT_SOURCE_IDS_SQL);
+			mGetIdsCountStmt = mSqlConnection.prepareStatement(
+				SELECT_IDS_COUNT_SQL);
+			mGetNameStmt  = mSqlConnection.prepareStatement(
+				SELECT_NAME_SQL);
+
 		} catch (SQLException e) {
 			mIsConnected = false;
 		}
@@ -150,6 +162,81 @@ public class DocDb {
 				e.toString());
 		}
 		return id;
+	}
+
+	private int getTotalSourceIds() {
+		if (!mIsConnected) return 0;
+		try {
+			ResultSet idCountRs = null;
+			int idCount = 0;
+
+			mGetIdsCountStmt.clearParameters();
+			mGetIdsCountStmt.execute();
+
+			idCountRs  = mGetIdsCountStmt.getResultSet();
+			if (idCountRs.next()) {
+				idCount = idCountRs.getInt(1);
+			}
+
+			return idCount;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return 0;
+		}
+	}
+
+	public int[] getSourceIds() {
+		if (!mIsConnected) return new int[0];
+		try {
+			int totalSourceIds = 0;
+			int i = 0;
+			int sourceIds[];
+			ResultSet sourceIdRs = null;
+
+			totalSourceIds = getTotalSourceIds();
+			sourceIds = new int[totalSourceIds];
+
+			mGetSourceIdsStmt.clearParameters();
+
+			mGetSourceIdsStmt.execute();
+
+			sourceIdRs  = mGetSourceIdsStmt.getResultSet();
+			while (sourceIdRs.next() && i < totalSourceIds) {
+				sourceIds[i++] = sourceIdRs.getInt(1);
+			}
+
+			return sourceIds;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new int[0];
+		}
+	}
+
+	public String getNameFromSourceId(int sourceId) {
+		if (!mIsConnected) return null;
+		try {
+			ResultSet nameRs = null;
+			String name = null;
+
+			mGetNameStmt.clearParameters();
+			mGetNameStmt.setInt(1, sourceId);
+
+			mGetNameStmt.execute();
+
+			nameRs = mGetNameStmt.getResultSet();
+			if (nameRs.next()) {
+				name = nameRs.getString(1);
+			}
+
+			if (nameRs != null) {
+				nameRs.close();
+			}
+
+			return name;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return null;
+		}
 	}
 
 	public String getDocumentationFromSourceId(int sourceId) {
