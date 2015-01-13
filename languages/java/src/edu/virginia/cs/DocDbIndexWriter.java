@@ -6,6 +6,11 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.document.StringField;
 import java.io.File;
 import java.io.IOException;
 import edu.virginia.cs.DocDb;
@@ -81,7 +86,38 @@ public class DocDbIndexWriter {
 		/*
 		 * Do the indexing.
 		 */
-		
+		int counter = 0;
+		int sourceIds[] = mDocDb.getSourceIds();
+		System.err.println("Total source ids: " + sourceIds.length);
+		for (int sourceId : sourceIds) {
+			String documentation = mDocDb.getDocumentationFromSourceId(sourceId);
+			String source = mDocDb.getSourceFromSourceId(sourceId);
+			String name = mDocDb.getNameFromSourceId(sourceId);
+			int memberId = mDocDb.getMemberIdFromSourceId(sourceId);
+
+			/*
+			 * Generate a new document.
+			 */
+			Document d = new Document();
+
+			/*
+			 * Add the fields.
+			 */
+			d.add(new IntField("id", sourceId, Field.Store.YES));
+			d.add(new IntField("memberId", memberId, Field.Store.YES));
+			d.add(new StringField("name", name, Field.Store.YES));
+			d.add(new TextField("source", source, Field.Store.NO));
+			d.add(new TextField("documentation", source, Field.Store.NO));
+
+			/*
+			 * Put it in the index.
+			 */
+			try {
+				indexWriter.addDocument(d);
+			} catch (IOException ioex) {
+				System.err.println("IO Error writing to index: " + ioex.toString());
+			}
+		}
 		try {
 			indexWriter.close();
 		} catch (IOException ioex) {
