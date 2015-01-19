@@ -32,7 +32,37 @@ class DocDb:
 			"(package_id, count, word1, word2) "
 			"VALUES "
 			"(%s, 1, %s, %s)")
+		self.update_invocations_query=(
+			"UPDATE source "
+			"SET invocations=%(invocations)s "
+			"WHERE id=%(source_id)s")
+		self.update_variables_query=(
+			"UPDATE source "
+			"SET variables=%(variables)s "
+			"WHERE id=%(source_id)s")
 		return True
+		
+	def addInvocations(self, source_id, invocations):
+		if not self.connected:
+			return (None, None)
+		cursor = self.connection.cursor()
+		cursor.execute(self.update_invocations_query,
+		{'source_id': source_id,
+		 'invocations': invocations,})
+		cursor.fetchone()
+		cursor.close()
+		self.connection.commit()
+	
+	def addVariables(self, source_id, variables):
+		if not self.connected:
+			return (None, None)
+		cursor = self.connection.cursor()
+		cursor.execute(self.update_variables_query,
+		{'source_id': source_id,
+		 'variables': variables,})
+		cursor.fetchone()
+		cursor.close()
+		self.connection.commit()
 
 	def addWordRelationship(self, package_id, word1, word2):
 		if not self.connected:
