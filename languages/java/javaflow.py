@@ -5,51 +5,8 @@ from __future__ import print_function
 import plyj.parser
 import plyj.model
 from flow import flow
+from languages.java import parseutils
 import docdb
-def collect_variables(statement):
-	left = []
-	right = []
-	base = []
-	target = []
-	arguments = []
-
-	# In case the statement is a binary operation
-	# v = lhs + rhs
-	# v = lhs - rhs
-	# etc
-	# descend down the lhs and rhs:
-	if hasattr(statement, 'lhs'):
-		left = collect_variables(statement.lhs)
-	if hasattr(statement, 'rhs'):
-		right = collect_variables(statement.rhs)
-
-	# Now, take care of different specific types
-	# of statements.
-	if type(statement) is plyj.model.Type:
-		base = [str(statement.name)]
-
-	elif type(statement) is plyj.model.InstanceCreation:
-		base = collect_variables(statement.type)
-		for ta in statement.type_arguments:
-			arguments.extend(collect_variables(ta))
-		for arg in statement.arguments:
-			arguments.extend(collect_variables(arg))
-
-	elif type(statement) is plyj.model.MethodInvocation:
-		base = [str(statement.name)]
-		target = collect_variables(statement.target)
-		for arg in statement.arguments:
-			arguments.extend(collect_variables(arg))
-
-	elif type(statement) is plyj.model.Name:
-		base = [str(statement.value)]
-
-	# Combine what we have.
-	base.extend(left)
-	base.extend(right)
-	base.extend(target)
-	base.extend(arguments)
-	return base
 
 class JavaFlow(flow.Flow):
 	def __init__(self, package_id, db):
@@ -72,7 +29,7 @@ class JavaFlow(flow.Flow):
 							elif hasattr(statement.lhs, 'name'):
 								word1 = str(statement.lhs.name)
 							words2 = []
-							for v in collect_variables(statement.rhs):
+							for v in parseutils.collect_variables(statement.rhs):
 								words2.extend(flow.splits(v))
 							if word1 is not None and len(words2) != 0:
 								words1 = flow.splits(word1)
@@ -89,6 +46,6 @@ class JavaFlow(flow.Flow):
 if __name__ == "__main__":
 	db = docdb.DocDb("localhost", "ir", "ir", "ir")
 	db.connect()
-	jf = JavaFlow(66, db)
+	jf = JavaFlow(1, db)
 	jf.calculate_flow()
 	db.disconnect()
