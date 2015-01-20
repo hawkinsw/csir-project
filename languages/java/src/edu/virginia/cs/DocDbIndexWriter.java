@@ -108,10 +108,14 @@ public class DocDbIndexWriter {
 			d.add(new IntField("id", sourceId, Field.Store.YES));
 			d.add(new IntField("memberId", memberId, Field.Store.YES));
 			d.add(new StringField("name", name, Field.Store.YES));
-			d.add(new TextField("source", source, Field.Store.NO));
-			d.add(new TextField("documentation", source, Field.Store.NO));
-			d.add(new TextField("variables", variables, Field.Store.YES));
-			d.add(new TextField("invocations", invocations, Field.Store.YES));
+			if (source != null && source.length() > 0)
+				d.add(new TextField("source", source, Field.Store.YES));
+			if (documentation != null && documentation.length() > 0)
+				d.add(new TextField("documentation", documentation, Field.Store.NO));
+			if (variables != null && variables.length() > 0)
+				d.add(new TextField("variables", variables, Field.Store.YES));
+			if (invocations != null && variables.length() > 0)
+				d.add(new TextField("invocations", invocations, Field.Store.YES));
 
 			/*
 			 * Put it in the index.

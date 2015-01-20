@@ -194,7 +194,7 @@ public class DocDb {
 		}
 	}
 	public String getVariablesFromSourceId(int sourceId) {
-		if (!mIsConnected) return new String("");
+		if (!mIsConnected) return null;
 		try {
 			ResultSet variablesRs = null;
 			String variables = "";
@@ -211,12 +211,12 @@ public class DocDb {
 			return variables;
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
-			return new String("");
+			return null;
 		}
 	}
 
 	public String getInvocationsFromSourceId(int sourceId) {
-		if (!mIsConnected) return new String("");
+		if (!mIsConnected) return null;
 		try {
 			ResultSet invocationsRs = null;
 			String invocations = "";
@@ -233,7 +233,7 @@ public class DocDb {
 			return invocations;
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
-			return new String("");
+			return null;
 		}
 	}
 
