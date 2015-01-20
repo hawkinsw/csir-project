@@ -93,6 +93,8 @@ public class DocDbIndexWriter {
 			String documentation = mDocDb.getDocumentationFromSourceId(sourceId);
 			String source = mDocDb.getSourceFromSourceId(sourceId);
 			String name = mDocDb.getNameFromSourceId(sourceId);
+			String variables = mDocDb.getVariablesFromSourceId(sourceId);
+			String invocations = mDocDb.getInvocationsFromSourceId(sourceId);
 			int memberId = mDocDb.getMemberIdFromSourceId(sourceId);
 
 			/*
@@ -108,6 +110,8 @@ public class DocDbIndexWriter {
 			d.add(new StringField("name", name, Field.Store.YES));
 			d.add(new TextField("source", source, Field.Store.NO));
 			d.add(new TextField("documentation", source, Field.Store.NO));
+			d.add(new TextField("variables", variables, Field.Store.YES));
+			d.add(new TextField("invocations", invocations, Field.Store.YES));
 
 			/*
 			 * Put it in the index.
