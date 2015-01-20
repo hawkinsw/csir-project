@@ -37,6 +37,8 @@ public class DocDb {
 	private PreparedStatement mGetSourceIdsStmt = null;
 	private PreparedStatement mGetIdsCountStmt = null;
 	private PreparedStatement mGetNameStmt = null;
+	private PreparedStatement mGetInvocationsStmt = null;
+	private PreparedStatement mGetVariablesStmt = null;
 
 	private static final String CALL_PARENTS_LIST_SQL = "{call parent_list(?)}";
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
@@ -59,6 +61,9 @@ public class DocDb {
 	private static final String SELECT_SOURCE_IDS_SQL = "SELECT id FROM source"; 
 	private static final String SELECT_IDS_COUNT_SQL = "SELECT count(id) FROM source"; 
 	private static final String SELECT_NAME_SQL = "SELECT name FROM source where id=?"; 
+	private static final String SELECT_INVOCATIONS_SQL = "SELECT invocations FROM source where id=?";
+	private static final String SELECT_VARIABLES_SQL = "SELECT variables FROM source where id=?";
+
 	public DocDb(String mysqlHost,
 		String mysqlUser,
 		String mysqlPass,
@@ -138,6 +143,10 @@ public class DocDb {
 				SELECT_IDS_COUNT_SQL);
 			mGetNameStmt  = mSqlConnection.prepareStatement(
 				SELECT_NAME_SQL);
+			mGetInvocationsStmt = mSqlConnection.prepareStatement(
+				SELECT_INVOCATIONS_SQL);
+			mGetVariablesStmt = mSqlConnection.prepareStatement(
+				SELECT_VARIABLES_SQL);
 
 		} catch (SQLException e) {
 			mIsConnected = false;
@@ -182,6 +191,49 @@ public class DocDb {
 		} catch (SQLException e) {
 			System.err.println("Warning: SQL exception: " + e.toString());
 			return 0;
+		}
+	}
+	public String getVariablesFromSourceId(int sourceId) {
+		if (!mIsConnected) return new String("");
+		try {
+			ResultSet variablesRs = null;
+			String variables = "";
+
+			mGetVariablesStmt.clearParameters();
+			mGetVariablesStmt.setInt(1, sourceId);
+			mGetVariablesStmt.execute();
+
+			variablesRs  = mGetVariablesStmt.getResultSet();
+			if (variablesRs.next()) {
+				variables = variablesRs.getString(1);
+			}
+
+			return variables;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new String("");
+		}
+	}
+
+	public String getInvocationsFromSourceId(int sourceId) {
+		if (!mIsConnected) return new String("");
+		try {
+			ResultSet invocationsRs = null;
+			String invocations = "";
+
+			mGetInvocationsStmt.clearParameters();
+			mGetInvocationsStmt.setInt(1, sourceId);
+			mGetInvocationsStmt.execute();
+
+			invocationsRs  = mGetInvocationsStmt.getResultSet();
+			if (invocationsRs.next()) {
+				invocations = invocationsRs.getString(1);
+			}
+
+			return invocations;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new String("");
 		}
 	}
 
