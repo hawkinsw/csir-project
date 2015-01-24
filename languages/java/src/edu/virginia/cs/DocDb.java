@@ -35,10 +35,14 @@ public class DocDb {
 	private CallableStatement mGetParentsStmt = null;
 	private PreparedStatement mGetMemberIdStmt = null;
 	private PreparedStatement mGetSourceIdsStmt = null;
-	private PreparedStatement mGetIdsCountStmt = null;
+	private PreparedStatement mCountIdsStmt = null;
 	private PreparedStatement mGetNameStmt = null;
 	private PreparedStatement mGetInvocationsStmt = null;
 	private PreparedStatement mGetVariablesStmt = null;
+	private PreparedStatement mGetSourceIdsOfMethodsStmt = null;
+	private PreparedStatement mGetSourceIdsOfClassesStmt = null;
+	private PreparedStatement mCountIdsOfMethodsStmt = null;
+	private PreparedStatement mCountIdsOfClassesStmt = null;
 
 	private static final String CALL_PARENTS_LIST_SQL = "{call parent_list(?)}";
 	private static final String INSERT_PACKAGE_SQL = "INSERT INTO package (name, package_file_name, package_url, package_source_language) VALUES (?,?,?, \"Java\")";
@@ -59,7 +63,11 @@ public class DocDb {
 	private static final String UPDATE_DEPENDENCY_ID_SQL = "UPDATE dependency SET depends_on_id=?, depends_on_name=\"\" WHERE depends_on_name=?";
 	private static final String SELECT_MEMBER_ID_SQL = "SELECT member_id FROM source WHERE id=?";
 	private static final String SELECT_SOURCE_IDS_SQL = "SELECT id FROM source"; 
+	private static final String SELECT_SOURCE_IDS_OF_METHODS_SQL = "SELECT id FROM source where type=\"method\""; 
+	private static final String SELECT_SOURCE_IDS_OF_CLASSES_SQL = "SELECT id FROM source where type=\"class\""; 
 	private static final String SELECT_IDS_COUNT_SQL = "SELECT count(id) FROM source"; 
+	private static final String SELECT_IDS_OF_METHODS_COUNT_SQL = "SELECT count(id) FROM source where type=\"method\""; 
+	private static final String SELECT_IDS_OF_CLASSES_COUNT_SQL = "SELECT count(id) FROM source where type=\"class\""; 
 	private static final String SELECT_NAME_SQL = "SELECT name FROM source where id=?"; 
 	private static final String SELECT_INVOCATIONS_SQL = "SELECT invocations FROM source where id=?";
 	private static final String SELECT_VARIABLES_SQL = "SELECT variables FROM source where id=?";
@@ -139,8 +147,16 @@ public class DocDb {
 				SELECT_MEMBER_ID_SQL);
 			mGetSourceIdsStmt = mSqlConnection.prepareStatement(
 				SELECT_SOURCE_IDS_SQL);
-			mGetIdsCountStmt = mSqlConnection.prepareStatement(
+			mGetSourceIdsOfMethodsStmt = mSqlConnection.prepareStatement(
+				SELECT_SOURCE_IDS_OF_METHODS_SQL);
+			mGetSourceIdsOfClassesStmt = mSqlConnection.prepareStatement(
+				SELECT_SOURCE_IDS_OF_CLASSES_SQL);
+			mCountIdsStmt = mSqlConnection.prepareStatement(
 				SELECT_IDS_COUNT_SQL);
+			mCountIdsOfMethodsStmt = mSqlConnection.prepareStatement(
+				SELECT_IDS_OF_METHODS_COUNT_SQL);
+			mCountIdsOfClassesStmt = mSqlConnection.prepareStatement(
+				SELECT_IDS_OF_CLASSES_COUNT_SQL);
 			mGetNameStmt  = mSqlConnection.prepareStatement(
 				SELECT_NAME_SQL);
 			mGetInvocationsStmt = mSqlConnection.prepareStatement(
@@ -173,16 +189,16 @@ public class DocDb {
 		return id;
 	}
 
-	private int getTotalSourceIds() {
+	private int countSourceIdsOfClasses() {
 		if (!mIsConnected) return 0;
 		try {
 			ResultSet idCountRs = null;
 			int idCount = 0;
 
-			mGetIdsCountStmt.clearParameters();
-			mGetIdsCountStmt.execute();
+			mCountIdsOfClassesStmt.clearParameters();
+			mCountIdsOfClassesStmt.execute();
 
-			idCountRs  = mGetIdsCountStmt.getResultSet();
+			idCountRs  = mCountIdsOfClassesStmt.getResultSet();
 			if (idCountRs.next()) {
 				idCount = idCountRs.getInt(1);
 			}
@@ -193,6 +209,49 @@ public class DocDb {
 			return 0;
 		}
 	}
+
+	private int countSourceIdsOfMethods() {
+		if (!mIsConnected) return 0;
+		try {
+			ResultSet idCountRs = null;
+			int idCount = 0;
+
+			mCountIdsOfMethodsStmt.clearParameters();
+			mCountIdsOfMethodsStmt.execute();
+
+			idCountRs  = mCountIdsOfMethodsStmt.getResultSet();
+			if (idCountRs.next()) {
+				idCount = idCountRs.getInt(1);
+			}
+
+			return idCount;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return 0;
+		}
+	}
+
+	private int countSourceIds() {
+		if (!mIsConnected) return 0;
+		try {
+			ResultSet idCountRs = null;
+			int idCount = 0;
+
+			mCountIdsStmt.clearParameters();
+			mCountIdsStmt.execute();
+
+			idCountRs  = mCountIdsStmt.getResultSet();
+			if (idCountRs.next()) {
+				idCount = idCountRs.getInt(1);
+			}
+
+			return idCount;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return 0;
+		}
+	}
+
 	public String getVariablesFromSourceId(int sourceId) {
 		if (!mIsConnected) return null;
 		try {
@@ -237,6 +296,61 @@ public class DocDb {
 		}
 	}
 
+	public int[] getSourceIdsOfClasses() {
+		if (!mIsConnected) return new int[0];
+		try {
+			int totalSourceIds = 0;
+			int i = 0;
+			int sourceIds[];
+			ResultSet sourceIdRs = null;
+
+			totalSourceIds = countSourceIdsOfClasses();
+			sourceIds = new int[totalSourceIds];
+
+			mGetSourceIdsOfClassesStmt.clearParameters();
+
+			mGetSourceIdsOfClassesStmt.execute();
+
+			sourceIdRs  = mGetSourceIdsOfClassesStmt.getResultSet();
+			while (sourceIdRs.next() && i < totalSourceIds) {
+				sourceIds[i++] = sourceIdRs.getInt(1);
+			}
+
+			return sourceIds;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new int[0];
+		}
+	}
+
+
+	public int[] getSourceIdsOfMethods() {
+		if (!mIsConnected) return new int[0];
+		try {
+			int totalSourceIds = 0;
+			int i = 0;
+			int sourceIds[];
+			ResultSet sourceIdRs = null;
+
+			totalSourceIds = countSourceIdsOfMethods();
+			sourceIds = new int[totalSourceIds];
+
+			mGetSourceIdsOfMethodsStmt.clearParameters();
+
+			mGetSourceIdsOfMethodsStmt.execute();
+
+			sourceIdRs  = mGetSourceIdsOfMethodsStmt.getResultSet();
+			while (sourceIdRs.next() && i < totalSourceIds) {
+				sourceIds[i++] = sourceIdRs.getInt(1);
+			}
+
+			return sourceIds;
+		} catch (SQLException e) {
+			System.err.println("Warning: SQL exception: " + e.toString());
+			return new int[0];
+		}
+	}
+
 	public int[] getSourceIds() {
 		if (!mIsConnected) return new int[0];
 		try {
@@ -245,7 +359,7 @@ public class DocDb {
 			int sourceIds[];
 			ResultSet sourceIdRs = null;
 
-			totalSourceIds = getTotalSourceIds();
+			totalSourceIds = countSourceIds();
 			sourceIds = new int[totalSourceIds];
 
 			mGetSourceIdsStmt.clearParameters();
@@ -343,7 +457,10 @@ public class DocDb {
 			parsedParentsList = parentsList.split(",");
 			parents = new int[parsedParentsList.length];
 			for (String parent : parsedParentsList) {
-				parents[counter] = Integer.parseInt(parent);
+				if (parent.length() != 0)
+					parents[counter] = Integer.parseInt(parent);
+				else
+					parents[counter] = -1;
 				counter++;
 			}
 
