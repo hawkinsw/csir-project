@@ -25,9 +25,12 @@ public class DocDbIndexWriter {
 	private static DocDb mDocDb = null;
 
 	public static void main(String params[]) {
-		File indexPath = null;
-		IndexWriterConfig indexWriterConfig = null;
-		IndexWriter indexWriter = null;
+		File methodIndexPath = null,
+			classIndexPath = null;
+		IndexWriterConfig methodIndexWriterConfig = null,
+			classIndexWriterConfig = null;
+		IndexWriter methodIndexWriter = null,
+			classIndexWriter = null;
 		StandardAnalyzer standardAnalyzer = null;
 
 		for (int i = 0; i<params.length; i++) {
@@ -70,14 +73,20 @@ public class DocDbIndexWriter {
 			return;
 		}
 
-		indexPath = new File(mIndexFile);
 		standardAnalyzer = new StandardAnalyzer();
-		indexWriterConfig = new IndexWriterConfig(Version.LATEST, standardAnalyzer);
+
+		methodIndexPath = new File(mIndexFile + "-method");
+		methodIndexWriterConfig = new IndexWriterConfig(Version.LATEST, standardAnalyzer);
+		classIndexPath = new File(mIndexFile + "-class");
+		classIndexWriterConfig = new IndexWriterConfig(Version.LATEST, standardAnalyzer);
 
 		try {
-			indexWriter = new IndexWriter(
-				FSDirectory.open(indexPath),
-				indexWriterConfig);
+			classIndexWriter = new IndexWriter(
+				FSDirectory.open(classIndexPath),
+				classIndexWriterConfig);
+			methodIndexWriter = new IndexWriter(
+				FSDirectory.open(methodIndexPath),
+				methodIndexWriterConfig);
 		} catch (IOException ioex) {
 			System.err.println("Could not open index file: " + ioex.toString());
 			return;
@@ -88,8 +97,11 @@ public class DocDbIndexWriter {
 		 */
 		int counter = 0;
 		int sourceIds[] = mDocDb.getSourceIds();
-		System.err.println("Total source ids: " + sourceIds.length);
-		for (int sourceId : sourceIds) {
+		int sourceIdsOfMethods[] = mDocDb.getSourceIdsOfMethods();
+		int sourceIdsOfClasses[] = mDocDb.getSourceIdsOfClasses();
+
+		System.err.println("Total method ids: " + sourceIdsOfMethods.length);
+		for (int sourceId : sourceIdsOfMethods) {
 			String documentation = mDocDb.getDocumentationFromSourceId(sourceId);
 			String source = mDocDb.getSourceFromSourceId(sourceId);
 			String name = mDocDb.getNameFromSourceId(sourceId);
@@ -101,33 +113,65 @@ public class DocDbIndexWriter {
 			 * Generate a new document.
 			 */
 			Document d = new Document();
-
 			/*
 			 * Add the fields.
 			 */
 			d.add(new IntField("id", sourceId, Field.Store.YES));
 			d.add(new IntField("memberId", memberId, Field.Store.YES));
-			d.add(new StringField("name", name, Field.Store.YES));
+			d.add(new TextField("name", name, Field.Store.YES));
 			if (source != null && source.length() > 0)
 				d.add(new TextField("source", source, Field.Store.YES));
 			if (documentation != null && documentation.length() > 0)
-				d.add(new TextField("documentation", documentation, Field.Store.NO));
+				d.add(new TextField("documentation", documentation, Field.Store.YES));
 			if (variables != null && variables.length() > 0)
 				d.add(new TextField("variables", variables, Field.Store.YES));
 			if (invocations != null && variables.length() > 0)
 				d.add(new TextField("invocations", invocations, Field.Store.YES));
-
 			/*
 			 * Put it in the index.
 			 */
 			try {
-				indexWriter.addDocument(d);
+				methodIndexWriter.addDocument(d);
+			} catch (IOException ioex) {
+				System.err.println("IO Error writing to index: " + ioex.toString());
+			}
+		}
+
+		System.err.println("Total class ids: " + sourceIdsOfClasses.length);
+		for (int sourceId : sourceIdsOfClasses) {
+			int parents[] = mDocDb.getParentsFromId(sourceId);
+			String documentation = mDocDb.getDocumentationFromSourceId(sourceId);
+			String name = mDocDb.getNameFromSourceId(sourceId);
+
+			assert(parents.length <= 1);
+
+			/*
+			 * Generate a new document.
+			 */
+			Document d = new Document();
+			/*
+			 * Add the fields.
+			 */
+			d.add(new IntField("id", sourceId, Field.Store.YES));
+			if (parents.length == 1)
+				d.add(new IntField("id", parents[0], Field.Store.YES));
+			else
+				d.add(new IntField("id", -1, Field.Store.YES));
+			d.add(new TextField("name", name, Field.Store.YES));
+			if (documentation != null && documentation.length() > 0)
+				d.add(new TextField("documentation", documentation, Field.Store.YES));
+			/*
+			 * Put it in the index.
+			 */
+			try {
+				classIndexWriter.addDocument(d);
 			} catch (IOException ioex) {
 				System.err.println("IO Error writing to index: " + ioex.toString());
 			}
 		}
 		try {
-			indexWriter.close();
+			methodIndexWriter.close();
+			classIndexWriter.close();
 		} catch (IOException ioex) {
 			System.err.println("Could not close index: " + ioex.toString());
 		}

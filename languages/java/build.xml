@@ -36,7 +36,7 @@
 	<target name="build-index" depends="jar" >
 		<java classname="edu.virginia.cs.DocDbIndexWriter">
 			<arg value="-index" />
-			<arg value="/tmp/index1" />
+			<arg value="/tmp/docdb-index" />
 			<arg value="-mysqlhost" />
 			<arg value="localhost" />
 			<arg value="-mysqluser"/>
